@@ -350,17 +350,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "rcnz_market"
-version = "0.1.0"
-source = "registry+git://advancedprogramming.disi.unitn.it/index"
-checksum = "afd66746f3eee34c076a58fac3f759126a4bf9c25937242f7747a01497f99cfd"
-dependencies = [
- "chrono",
- "rand",
- "unitn_market_2022",
-]
-
-[[package]]
 name = "ryu"
 version = "1.0.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -464,7 +453,6 @@ dependencies = [
  "RCNZ",
  "ZSE",
  "bfb",
- "rcnz_market",
  "unitn_market_2022",
 ]
 

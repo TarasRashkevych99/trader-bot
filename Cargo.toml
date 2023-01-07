@@ -8,7 +8,6 @@ authors = ["Roberto Cornacchiari, Alfredo Bombace, Sabin Andone [WGL], Taras Ras
 
 [dependencies]
 bfb = {version = "0.1.0", registry = "kellnr"}
-rcnz_market = {version = "0.1.0", registry = "kellnr"}
 RCNZ = {version = "0.1.0", registry = "kellnr"}
 ZSE = {version = "0.1.3", registry = "kellnr"}
 unitn_market_2022 = {version = "1.0.10", registry = "kellnr"}
