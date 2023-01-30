@@ -1,3 +1,5 @@
+mod tr_traders;
+
 use std::cell::RefCell;
 use std::rc::Rc;
 use bfb::bfb_market::Bfb as BFB;
