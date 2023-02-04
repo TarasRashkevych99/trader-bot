@@ -171,9 +171,6 @@ impl Trader_SA {
             //and their prices for each good, and see where we can get the most
             //from them
 
-            //let (best_market, best_kind, best_quantity) = &self.find_best_buy_price();
-
-
             let (best_quantity_bfb, kind_quantity_bfb) = self.how_much_buy(&self.bfb);
             let (best_quantity_rcnz, kind_quantity_rcnz) = self.how_much_buy(&self.rcnz);
             let (best_quantity_zse, kind_quantity_zse) = self.how_much_buy(&self.zse);
@@ -261,8 +258,7 @@ impl Trader_SA {
             }
 
             result.push(format!(
-                "{} {} {} {}",
-                "BUY".to_string(),
+                "Buy GoodKind: {} Quantity: {} Market Name: {}",
                 best_kind.to_string(),
                 best_quantity.to_string(),
                 best_market.borrow().get_name()
@@ -312,6 +308,7 @@ impl Trader_SA {
 
             let (best_market_sell, best_quantity_sell) = (best_market, best_qty_sell);
 
+            let market_name = best_market_sell.borrow().get_name();
 
             //we repeat the same procedure we did for the buy part, but now we consider variables for selling
             let price_sell = match best_market_sell.borrow().get_sell_price(best_kind, best_quantity_sell) {
@@ -332,7 +329,7 @@ impl Trader_SA {
             {
                 Ok(token_sell) => token_sell,
                 Err(e) => {
-                    panic!("Error in lock_sell: {:?}", e);
+                    panic!("Error in lock_sell: {:?} in {:?}", e, market_name);
                 }
             };
 
@@ -355,8 +352,7 @@ impl Trader_SA {
                 }
             }
             result.push(format!(
-                "{} {} {} {}",
-                "SELL".to_string(),
+                "Sell GoodKind: {} Quantity: {} Market Name: {}",
                 best_kind.to_string(),
                 best_quantity_sell.to_string(),
                 best_market_sell.borrow().get_name()
@@ -366,7 +362,7 @@ impl Trader_SA {
         }
 
         result.push(
-            format!("EUR: {}, USD: {}, YEN: {}, YUAN: {}",
+            format!("Trader goods: EUR: {}, USD: {}, YEN: {}, YUAN: {}",
                   self.cash,
                   self.get_trader_goodquantity(GoodKind::USD),
                   self.get_trader_goodquantity(GoodKind::YEN),
