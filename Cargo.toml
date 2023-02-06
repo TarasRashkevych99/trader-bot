@@ -7,7 +7,7 @@ authors = ["Roberto Cornacchiari, Alfredo Bombace, Sabin Andone [WGL], Taras Ras
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bfb = {version = "0.1.0", registry = "kellnr"}
-RCNZ = {version = "0.1.0", registry = "kellnr"}
-ZSE = {version = "0.1.3", registry = "kellnr"}
+bfb = {version = "0.1.2", registry = "kellnr"}
+RCNZ = {version = "0.1.1", registry = "kellnr"}
+ZSE = {version = "0.2.0", registry = "kellnr"}
 unitn_market_2022 = {version = "1.0.10", registry = "kellnr"}

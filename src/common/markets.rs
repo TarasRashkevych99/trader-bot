@@ -21,7 +21,7 @@ pub fn new_with_quantities(eur: f32, yen: f32, usd: f32, yuan: f32) -> (Rc<RefCe
      ZSE::new_with_quantities(eur, yen, usd, yuan))
 }
 
-pub fn print_results(title: &str, bfb: &Rc<RefCell<dyn Market>>, rcnz: &Rc<RefCell<dyn Market>>, zse: &Rc<RefCell<dyn Market>>) {
+pub fn print_markets(title: &str, bfb: &Rc<RefCell<dyn Market>>, rcnz: &Rc<RefCell<dyn Market>>, zse: &Rc<RefCell<dyn Market>>) {
     println!("{}", title);
     println!("BFB:");
     print_quantities(&bfb);
@@ -42,4 +42,12 @@ fn print_quantities(market: &Rc<RefCell<dyn Market>>) {
     for i in 0..goods.len() {
         println!("{:?}", goods[i]);
     }
+}
+
+pub fn print_results(result: Vec<String>) {
+
+    for i in result.iter(){
+        println!("{}", i);
+    }
+
 }
