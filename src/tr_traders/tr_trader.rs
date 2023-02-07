@@ -17,7 +17,7 @@ type Action = String;
 type Wallet = HashMap<GoodKind, f32>;
 type Transactions = Vec<(i32, MarketName, Action, Good)>;
 
-pub struct Trader {
+pub struct Trader_TR {
     name: String,
     wallet: Wallet,
     register: Register,
@@ -28,9 +28,9 @@ struct Register {
     day: i32,
 }
 
-impl Trader {
+impl Trader_TR {
     pub fn new(name: String) -> Self {
-        Trader {
+        Trader_TR {
             name,
             wallet: HashMap::from_iter(vec![
                 (GoodKind::EUR, 100.0),
@@ -60,6 +60,7 @@ impl Trader {
                     continue;
                 }
                 let lock_for_buying = market_to_buy_from.borrow_mut().lock_buy(good_kind.clone(), good_quantity_to_buy, price_market_wants_to_be_paid, self.name.clone());
+                self.register.day += 1;
                 if let Ok(token) = lock_for_buying {
                     let purchase = market_to_buy_from.borrow_mut().buy(token, &mut Good::new(GoodKind::EUR, price_market_wants_to_be_paid));
                     if let Ok(good) = purchase {
@@ -76,6 +77,7 @@ impl Trader {
                         continue;
                     }
                     let lock_for_selling = market_to_sell_to.borrow_mut().lock_sell(good_kind.clone(), good_quantity_to_sell, price_market_has_to_pay, self.name.clone());
+                    self.register.day += 1;
                     if let Ok(token) = lock_for_selling {
                         let sale = market_to_sell_to.borrow_mut().sell(token, &mut Good::new(good_kind.clone(), good_quantity_to_sell));
                         if let Ok(good) = sale {
@@ -243,7 +245,7 @@ mod test {
 
     #[test]
     fn test_get_money_by_kind() {
-        let mut trader = Trader::new("RAST".to_string());
+        let mut trader = Trader_TR::new("RAST".to_string());
         assert_eq!(trader.get_money_by_kind(GoodKind::EUR), 100.0);
         assert_eq!(trader.get_money_by_kind(GoodKind::USD), 100.0);
         assert_eq!(trader.get_money_by_kind(GoodKind::YUAN), 100.0);
@@ -252,7 +254,7 @@ mod test {
 
     #[test]
     fn test_get_default_exchange_rates() {
-        let mut trader = Trader::new("RAST".to_string());
+        let mut trader = Trader_TR::new("RAST".to_string());
         assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::EUR).unwrap(), &1.0);
         assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::USD).unwrap(), &DEFAULT_EUR_USD_EXCHANGE_RATE);
         assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::YUAN).unwrap(), &DEFAULT_EUR_YUAN_EXCHANGE_RATE);
@@ -261,7 +263,7 @@ mod test {
 
     #[test]
     fn test_get_all_money_in_euro() {
-        let mut trader = Trader::new("RAST".to_string());
+        let mut trader = Trader_TR::new("RAST".to_string());
         let mut total_amount = trader.get_money_by_kind(GoodKind::EUR) / 1.0;
         total_amount += trader.get_money_by_kind(GoodKind::USD) / DEFAULT_EUR_USD_EXCHANGE_RATE;
         total_amount += trader.get_money_by_kind(GoodKind::YUAN) / DEFAULT_EUR_YUAN_EXCHANGE_RATE;
