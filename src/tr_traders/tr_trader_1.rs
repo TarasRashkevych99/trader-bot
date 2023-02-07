@@ -45,71 +45,103 @@ impl Trader {
         }
     }
 
-    pub fn trade_with_all_markets(&mut self, bfb: &mut ChosenMarket, rcnz: &mut ChosenMarket, zse: &mut ChosenMarket) {
+    pub fn trade_with_all_markets(&mut self, bfb: &mut ChosenMarket, rcnz: &mut ChosenMarket, zse: &mut ChosenMarket, trading_days: i32) {
         loop {
-            if self.register.day == 10000 {
+            if self.register.day == trading_days {
                 break;
             }
             let (good_kind, market_to_buy_from, market_to_sell_to) = self.get_max_profit_pair_by_exchange_rate(Rc::clone(bfb), Rc::clone(rcnz), Rc::clone(zse), self.get_priority());
 
-            let available_quantity_to_buy = self.get_market_good_quantity_by_kind(&market_to_buy_from, &good_kind);
+            let available_good_quantity_to_buy = self.get_market_good_quantity_by_kind(&market_to_buy_from, &good_kind);
 
-            if available_quantity_to_buy > 0.0 && available_quantity_to_buy > 1.0e-3 {
-                let quantity_to_buy = available_quantity_to_buy * 2.0 / 3.0;
-                let bid = market_to_buy_from.borrow().get_buy_price(good_kind.clone(), quantity_to_buy).unwrap();
-                let lock_for_buying = market_to_buy_from.borrow_mut().lock_buy(good_kind.clone(), quantity_to_buy, bid, self.name.clone());
-                match lock_for_buying {
-                    Ok(token) => {
-                        println!("Locked successfully");
-                        let purchase = market_to_buy_from.borrow_mut().buy(token, &mut Good::new(GoodKind::EUR, bid));
-                        match purchase {
-                            Ok(good) => {
-                                println!("Purchase successful {}", good.get_qty());
-                                self.update_internal_state_after_buying(&market_to_buy_from, bid, good, "sold".to_string());
-                            }
-                            Err(e) => {
-                                println!("Purchase failed");
-                            }
-                        }
-                    }
-                    Err(e) => {
-                        println!("Transaction failed");
+            if self.is_positive_and_big_enough(available_good_quantity_to_buy) {
+                let (good_quantity_to_buy, price_market_wants_to_be_paid) = self.calculate_optimal_purchase_option(Rc::clone(&market_to_buy_from), available_good_quantity_to_buy, good_kind.clone());
+                if !self.is_positive_and_big_enough(good_quantity_to_buy) {
+                    continue;
+                }
+                let lock_for_buying = market_to_buy_from.borrow_mut().lock_buy(good_kind.clone(), good_quantity_to_buy, price_market_wants_to_be_paid, self.name.clone());
+                if let Ok(token) = lock_for_buying {
+                    let purchase = market_to_buy_from.borrow_mut().buy(token, &mut Good::new(GoodKind::EUR, price_market_wants_to_be_paid));
+                    if let Ok(good) = purchase {
+                        println!("Purchased successfully {} of {} and paid {}", good.get_qty(), good.get_kind(), price_market_wants_to_be_paid);
+                        self.update_internal_state_after_buying(&market_to_buy_from, price_market_wants_to_be_paid, good, "sold".to_string());
                     }
                 }
 
                 let available_quantity_to_pay_with = self.get_market_good_quantity_by_kind(&market_to_sell_to, &GoodKind::EUR);
 
-                if available_quantity_to_pay_with > 0.0 && available_quantity_to_pay_with > 1.0e-3 {
-                    let quantity_to_pay_with = available_quantity_to_pay_with * 2.0 / 3.0;
-                    let mut offer = market_to_sell_to.borrow().get_sell_price(good_kind.clone(), quantity_to_buy).unwrap();
-                    if offer > quantity_to_pay_with {
-                        offer = quantity_to_pay_with;
+                if self.is_positive_and_big_enough(available_quantity_to_pay_with) {
+                    let (good_quantity_to_sell, price_market_has_to_pay) = self.calculate_optimal_sale_option(Rc::clone(&market_to_sell_to), available_quantity_to_pay_with, good_kind.clone(), good_quantity_to_buy);
+                    if !self.is_positive_and_big_enough(good_quantity_to_sell) {
+                        continue;
                     }
-                    let lock_for_selling = market_to_sell_to.borrow_mut().lock_sell(good_kind.clone(), quantity_to_buy, offer, self.name.clone());
-                    match lock_for_selling {
-                        Ok(token) => {
-                            println!("Locked successfully");
-                            let sale = market_to_sell_to.borrow_mut().sell(token, &mut Good::new(good_kind.clone(), quantity_to_buy));
-                            match sale {
-                                Ok(good) => {
-                                    println!("Sale successful {}", good.get_qty());
-                                    self.update_internal_state_after_selling(&market_to_sell_to, offer, Good::new(good_kind, quantity_to_buy), "bought".to_string());
-                                }
-                                Err(e) => {
-                                    println!("Sale failed");
-                                }
-                            }
-                        }
-                        Err(e) => {
-                            println!("Transaction failed");
+                    let lock_for_selling = market_to_sell_to.borrow_mut().lock_sell(good_kind.clone(), good_quantity_to_sell, price_market_has_to_pay, self.name.clone());
+                    if let Ok(token) = lock_for_selling {
+                        let sale = market_to_sell_to.borrow_mut().sell(token, &mut Good::new(good_kind.clone(), good_quantity_to_sell));
+                        if let Ok(good) = sale {
+                            println!("Sold successfully {} of {} and earned {}", good_quantity_to_sell, good_kind, price_market_has_to_pay);
+                            self.update_internal_state_after_selling(&market_to_sell_to, good.get_qty(), Good::new(good_kind, good_quantity_to_sell), "bought".to_string());
                         }
                     }
                 }
             } else {
-                // println!("Waiting for a day");
+                println!("Waiting for a day");
+                self.register.day += 1;
                 wait_one_day!(bfb, rcnz, zse);
             }
         }
+    }
+
+    pub fn print_wallet_per_kind(&self) {
+        println!("Wallet of {}", self.name);
+        for (kind, qty) in self.wallet.iter() {
+            println!("{}: {}", kind, qty);
+        }
+    }
+
+    pub fn print_wallet_in_euro(&self) {
+        println!("Wallet of {} in euro", self.name);
+        println!("Amount: {}", self.get_all_money_in_euro());
+    }
+
+    pub fn print_register(&self) {
+        println!("Register of {}", self.name);
+        for (day, market_name, action, good) in self.register.transactions.iter() {
+            let mut to_form_pair = "to".to_string();
+            if action == "bought" {
+                to_form_pair = "from".to_string();
+            }
+            println!("Day {}: {} {} {} {} {}", day, market_name, action, good, to_form_pair, self.name);
+        }
+    }
+
+    fn get_budget_in_euro(&self) -> f32 {
+        self.get_money_by_kind(GoodKind::EUR)
+    }
+
+    fn is_positive_and_big_enough(&self, quantity: f32) -> bool {
+        quantity > 0.0 && quantity > 1.0
+    }
+
+    fn calculate_optimal_purchase_option(&self, market: ChosenMarket, available_good_quantity_to_buy: f32, good_kind: GoodKind) -> (f32, f32) {
+        let mut good_quantity_to_buy = available_good_quantity_to_buy * 2.0 / 3.0;
+        let mut price_market_wants_to_be_paid = market.borrow().get_buy_price(good_kind.clone(), good_quantity_to_buy).unwrap();
+        while price_market_wants_to_be_paid > self.get_budget_in_euro() {
+            good_quantity_to_buy /= 2.0;
+            price_market_wants_to_be_paid = market.borrow().get_buy_price(good_kind.clone(), good_quantity_to_buy).unwrap();
+        }
+        (good_quantity_to_buy, price_market_wants_to_be_paid)
+    }
+
+    fn calculate_optimal_sale_option(&self, market: ChosenMarket, good_available_quantity_to_pay_with: f32, good_kind: GoodKind, good_quantity_to_buy: f32) -> (f32, f32) {
+        let mut good_quantity_to_pay_with = good_available_quantity_to_pay_with * 2.0 / 3.0;
+        let mut good_quantity_to_sell = good_quantity_to_buy;
+        let mut price_market_has_to_pay = market.borrow().get_sell_price(good_kind.clone(), good_quantity_to_sell).unwrap();
+        while price_market_has_to_pay > good_quantity_to_pay_with {
+            good_quantity_to_sell /= 2.0;
+            price_market_has_to_pay = market.borrow().get_sell_price(good_kind.clone(), good_quantity_to_sell).unwrap();
+        }
+        (good_quantity_to_sell, price_market_has_to_pay)
     }
 
     fn get_max_profit_pair_by_exchange_rate(&self, bfb: ChosenMarket, rcnz: ChosenMarket, zse: ChosenMarket, priority: usize) -> (GoodKind, ChosenMarket, ChosenMarket) {
@@ -155,25 +187,6 @@ impl Trader {
         self.register.transactions.push((self.register.day, self.get_market_name(&market), action, good.clone()));
         self.wallet.insert(good.get_kind().clone(), self.get_money_by_kind(good.get_kind().clone()) - good.get_qty());
         self.wallet.insert(GoodKind::EUR, self.get_money_by_kind(GoodKind::EUR) + amount);
-    }
-
-    pub fn print_wallet_per_kind(&self) {
-        println!("Wallet of {}", self.name);
-        for (kind, qty) in self.wallet.iter() {
-            println!("{}: {}", kind, qty);
-        }
-    }
-
-    pub fn print_wallet_in_euro(&self) {
-        println!("Wallet of {} in euro", self.name);
-        println!("Amount: {}", self.get_all_money_in_euro());
-    }
-
-    pub fn print_register(&self) {
-        println!("Register of {}", self.name);
-        for (day, market, action, good) in self.register.transactions.iter() {
-            println!("Day {}: {} {} {}", day, market, action, good);
-        }
     }
 
     pub fn get_all_money_in_euro(&self) -> f32 {
@@ -255,14 +268,4 @@ mod test {
         total_amount += trader.get_money_by_kind(GoodKind::YEN) / DEFAULT_EUR_YEN_EXCHANGE_RATE;
         assert!(f32::abs(trader.get_all_money_in_euro() - total_amount) < 0.0001);
     }
-
-    // #[test]
-    // fn test_get_max_profit_pair_by_exchange_rate() {
-    //     let mut trader = Trader::new("RAST".to_string());
-    //     let (mut bfb, mut rcnz, mut zse) = new_with_quantities(100.0, 100.0, 100.0, 100.0);
-    //     let (good_to_trade, market_to_buy_from, market_to_sell_to) = trader.get_max_profit_pair_by_exchange_rate(bfb.clone(), rcnz.clone(), zse.clone());
-    //     assert_eq!(good_to_trade, GoodKind::YEN);
-    //     assert_eq!(market_to_buy_from.borrow().get_name(), "Baku stock exchange");
-    //     assert_eq!(market_to_sell_to.borrow().get_name(), "ZSE");
-    // }
 }
