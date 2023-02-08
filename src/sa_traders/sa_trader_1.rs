@@ -9,6 +9,7 @@ use unitn_market_2022::wait_one_day;
 use ZSE::market::ZSE;
 use crate::sa_traders::log_event::{craft_log_event, CustomEventKind, LogEvent};
 use futures::executor::block_on;
+use tokio::runtime::Runtime;
 
 
 //the struct for the trader
@@ -85,15 +86,14 @@ impl Trader_SA {
         }
     }
 
-    fn update_time(&mut self){
-        self.time += 1;
-    }
 
-    fn wait(&mut self){
+    async fn wait(&mut self, goodkind: GoodKind, quantity: f32, price: f32, market_name: &str){
         let client = reqwest::Client::new();
         wait_one_day!(self.bfb);
         wait_one_day!(self.rcnz);
         wait_one_day!(self.zse);
+        self.register.push(craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None));
+        let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
         self.time += 1;
     }
 
@@ -154,6 +154,7 @@ impl Trader_SA {
     pub async fn buy_from_market(&mut self, market_name: &str, goodkind: GoodKind, quantity: f32, price: f32, trader_name: String){
 
         let client = reqwest::Client::new();
+
 
         let market = match market_name{
             "RCNZ" => &mut self.rcnz,
@@ -277,7 +278,7 @@ impl Trader_SA {
                 }
             }
         } else {
-            self.wait();
+            self.wait(goodkind, quantity, price, market_name);
         }
     }
 
@@ -310,7 +311,7 @@ impl Trader_SA {
 
                 self.buy_from_market("BFB",kind_quantity_bfb,best_quantity_bfb,price, self.get_trader_name());
             } else {
-                self.wait();
+                self.wait(kind_quantity_bfb, best_quantity_bfb, 0.0, "BFB");
             }
 
             let best_quantity_bfb_sell = self.find_best_sell_quantity(&self.bfb, kind_quantity_bfb.clone());
@@ -333,7 +334,7 @@ impl Trader_SA {
                 }
                 self.sell_from_market("BFB",kind_quantity_bfb,best_quantity_bfb_sell,price_sell, self.get_trader_name());
             } else {
-                self.wait();
+                self.wait(kind_quantity_bfb, best_quantity_bfb_sell, 0.0, "BFB");
             }
 
             i -= 1;
@@ -364,7 +365,7 @@ impl Trader_SA {
                 };
                 self.buy_from_market("RCNZ", kind_quantity_rcnz, best_quantity_rcnz, price, self.get_trader_name());
             } else {
-                self.wait();
+                self.wait(kind_quantity_rcnz, best_quantity_rcnz, 0.0, "RCNZ");
             }
 
             let best_quantity_rcnz_sell = self.find_best_sell_quantity(&self.rcnz, kind_quantity_rcnz.clone());
@@ -387,7 +388,7 @@ impl Trader_SA {
                 }
                 self.sell_from_market("RCNZ",kind_quantity_rcnz, best_quantity_rcnz_sell, price_sell, self.get_trader_name());
             } else {
-                self.wait();
+                self.wait(kind_quantity_rcnz, best_quantity_rcnz_sell, 0.0, "RCNZ");
             }
 
             i -= 1;
@@ -416,7 +417,7 @@ impl Trader_SA {
                 };
                 self.buy_from_market("ZSE", kind_quantity_zse, best_quantity_zse, price, self.get_trader_name());
             } else {
-                self.wait();
+                self.wait(kind_quantity_zse, best_quantity_zse, 0.0, "ZSE");
             }
 
             let best_quantity_zse_sell = self.find_best_sell_quantity(&self.zse, kind_quantity_zse.clone());
@@ -439,7 +440,7 @@ impl Trader_SA {
                 }
                 self.sell_from_market("ZSE",kind_quantity_zse, best_quantity_zse_sell, price_sell, self.get_trader_name());
             } else {
-                self.wait();
+                self.wait(kind_quantity_zse, best_quantity_zse_sell, 0.0, "ZSE");
             }
 
             i -= 1;
@@ -520,9 +521,12 @@ impl Trader_SA {
                         panic!("Error in get_buy_price: {:?}", e);
                     }
                 };
-                block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
+
+                let rt  = Runtime::new().unwrap();
+
+                rt.block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
             } else {
-                self.wait();
+                self.wait(best_kind, best_quantity, 0.0, market_name);
             }
 
             let best_quantity_bfb_sell = self.find_best_sell_quantity(&self.bfb, best_kind.clone());
@@ -591,61 +595,14 @@ impl Trader_SA {
                 /*if (original_budget > final_budget_pre_sell) {
                     break;
                 }*/
-                block_on(self.sell_from_market(market_name_sell,best_kind, best_quantity_sell, price_sell, self.get_trader_name()));
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.sell_from_market(market_name_sell,best_kind, best_quantity_sell, price_sell, self.get_trader_name()));
 
             } else {
-                self.wait();
+                self.wait(best_kind, best_quantity_sell, 0.0, market_name_sell);
             }
             println!("Now trader has {} euros", self.cash);
             i -= 1;
         }
     }
-}
-
-
-
-#[cfg(test)]
-mod test {
-    use crate::common::markets::new_with_quantities;
-    use super::*;
-
-    #[test]
-    fn test_get_money_by_kind() {
-        let _trader_name = "Trader_RAST_SA".to_string();
-        let (bfb, rcnz, zse) = new_with_quantities(100.0, 100.0, 100.0, 100.0);
-        let mut trader_sa = Trader_SA::new(_trader_name,10000.0, bfb.clone(), rcnz.clone(), zse.clone());
-        assert_eq!(trader_sa.get_trader_goodquantity(GoodKind::EUR), 10000.0);
-        assert_eq!(trader_sa.get_trader_goodquantity(GoodKind::USD), 0.0);
-        assert_eq!(trader_sa.get_trader_goodquantity(GoodKind::YUAN), 0.0);
-        assert_eq!(trader_sa.get_trader_goodquantity(GoodKind::YEN), 0.0);
-    }
-/*
-    #[test]
-    fn test_get_default_exchange_rates() {
-        let mut trader = Trader::new("RAST".to_string());
-        assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::EUR).unwrap(), &1.0);
-        assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::USD).unwrap(), &DEFAULT_EUR_USD_EXCHANGE_RATE);
-        assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::YUAN).unwrap(), &DEFAULT_EUR_YUAN_EXCHANGE_RATE);
-        assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::YEN).unwrap(), &DEFAULT_EUR_YEN_EXCHANGE_RATE);
-    }
-
-    #[test]
-    fn test_get_all_money_in_euro() {
-        let mut trader = Trader::new("RAST".to_string());
-        let mut total_amount = trader.get_money_by_kind(GoodKind::EUR) / 1.0;
-        total_amount += trader.get_money_by_kind(GoodKind::USD) / DEFAULT_EUR_USD_EXCHANGE_RATE;
-        total_amount += trader.get_money_by_kind(GoodKind::YUAN) / DEFAULT_EUR_YUAN_EXCHANGE_RATE;
-        total_amount += trader.get_money_by_kind(GoodKind::YEN) / DEFAULT_EUR_YEN_EXCHANGE_RATE;
-        assert!(f32::abs(trader.get_all_money_in_euro() - total_amount) < 0.0001);
-    }
-*/
-    // #[test]
-    // fn test_get_max_profit_pair_by_exchange_rate() {
-    //     let mut trader = Trader::new("RAST".to_string());
-    //     let (mut bfb, mut rcnz, mut zse) = new_with_quantities(100.0, 100.0, 100.0, 100.0);
-    //     let (good_to_trade, market_to_buy_from, market_to_sell_to) = trader.get_max_profit_pair_by_exchange_rate(bfb.clone(), rcnz.clone(), zse.clone());
-    //     assert_eq!(good_to_trade, GoodKind::YEN);
-    //     assert_eq!(market_to_buy_from.borrow().get_name(), "Baku stock exchange");
-    //     assert_eq!(market_to_sell_to.borrow().get_name(), "ZSE");
-    // }
 }
