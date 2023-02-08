@@ -44,6 +44,7 @@ fn print_quantities(market: &Rc<RefCell<dyn Market>>) {
     }
 }
 
+//function to print the results obtained from the trader's actions
 pub fn print_results(result: Vec<String>) {
 
     for i in result.iter(){

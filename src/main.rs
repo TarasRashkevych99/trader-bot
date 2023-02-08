@@ -8,6 +8,8 @@ use crate::sa_traders::sa_trader_1::{Trader_SA};
 
 
 fn main() {
+    let client = reqwest::Client::new();
+
     let _trader_name = "RAST".to_string();
 
     // the random initialization of the markets
@@ -20,14 +22,22 @@ fn main() {
 
     print_markets("Markets with fixed quantities", &bfb, &rcnz, &zse);
 
-    let mut trader_sa = Trader_SA::new(10000.0, bfb.clone(), rcnz.clone(), zse.clone());
+    let mut trader_sa = Trader_SA::new(_trader_name,1000.0, bfb.clone(), rcnz.clone(), zse.clone());
 
-    let result = trader_sa.strategy(3);
+    trader_sa.strategy(10);
 
-    //println!("{:?}", result);
+    //println!("{:?}", trader_sa.register);
 
-    print_results(result);
+    //print_results(result);
+
+    for i in trader_sa.register.iter(){
+        println!("{:?}",i);
+    }
+
 
     print_markets("Markets after with fixed quantities", &bfb, &rcnz, &zse);
+
+    //let _res = client.post("http://localhost:8000/log").json(&craft_log_event(&event, "BFB".to_string(), true, None)).send().await;
+
 
 }
