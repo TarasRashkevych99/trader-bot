@@ -14,3 +14,4 @@ unitn_market_2022 = {version = "1.0.10", registry = "kellnr"}
 serde = "1.0.130"
 reqwest = { version = "0.11", features = ["json"] }
 tokio = { version = "1", features = ["full"] }
+futures = "0.3.25"

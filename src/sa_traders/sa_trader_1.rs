@@ -8,6 +8,7 @@ use RCNZ::RCNZ;
 use unitn_market_2022::wait_one_day;
 use ZSE::market::ZSE;
 use crate::sa_traders::log_event::{craft_log_event, CustomEventKind, LogEvent};
+use futures::executor::block_on;
 
 
 //the struct for the trader
@@ -41,7 +42,7 @@ impl Trader_SA {
             rcnz,
             zse,
             register: vec![],
-            time: 0
+            time: 1
         }
     }
 
@@ -88,10 +89,12 @@ impl Trader_SA {
         self.time += 1;
     }
 
-    fn wait(&self){
+    fn wait(&mut self){
+        let client = reqwest::Client::new();
         wait_one_day!(self.bfb);
         wait_one_day!(self.rcnz);
         wait_one_day!(self.zse);
+        self.time += 1;
     }
 
     //OTHER METHODS USED FOR STRATEGY:
@@ -148,7 +151,9 @@ impl Trader_SA {
         best_quantity
     }
 
-    pub fn buy_from_market(&mut self, market_name: &str, goodkind: GoodKind, quantity: f32, price: f32, trader_name: String){
+    pub async fn buy_from_market(&mut self, market_name: &str, goodkind: GoodKind, quantity: f32, price: f32, trader_name: String){
+
+        let client = reqwest::Client::new();
 
         let market = match market_name{
             "RCNZ" => &mut self.rcnz,
@@ -161,12 +166,15 @@ impl Trader_SA {
                 Ok(token) => token,
                 Err(e) => {
                     let e_string = format!("{:?}",e);
-                    self.register.push(craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), false, Some(e_string)));
+                    self.register.push(craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone())));
+                    let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                     panic!("Error in lock_buy in {}: {:?}", market_name, e);
                 }
             };
 
         self.register.push(craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), true, None));
+        let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
+
         //self.update_time();
         self.time += 1;
 
@@ -175,12 +183,14 @@ impl Trader_SA {
             Ok(increase) => increase,
             Err(e) => {
                 let e_string = format!("{:?}",e);
-                self.register.push(craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), false, Some(e_string)));
+                self.register.push(craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone())));
+                let _res = client.post("http://http://127.0.0.1:8000//log").json(&craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                 panic!("Error in buy in bfb: {:?}", e);
             }
         };
 
         self.register.push(craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), true, None));
+        let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
         //self.update_time();
         self.time += 1;
 
@@ -197,7 +207,9 @@ impl Trader_SA {
         }
     }
 
-    pub fn sell_from_market(&mut self, market_name: &str, goodkind: GoodKind, quantity: f32, price: f32, trader_name: String){
+    pub async fn sell_from_market(&mut self, market_name: &str, goodkind: GoodKind, quantity: f32, price: f32, trader_name: String){
+
+        let client = reqwest::Client::new();
 
         let market = match market_name{
             "RCNZ" => &mut self.rcnz,
@@ -212,14 +224,19 @@ impl Trader_SA {
             Ok(token_sell) => token_sell,
             Err(LockSellError::MaxAllowedLocksReached) => {
                 bool_sell_error = true;
+                let e_string = format!("LockSellError::MaxAllowedLocksReached");
+                let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                 "LockSellError::MaxAllowedLocksReached".to_string()
-            }
-            Err(LockSellError::MaxAllowedLocksReached) => {
+            },
+            Err(LockSellError::InsufficientDefaultGoodQuantityAvailable{ .. }) => {
                 bool_sell_error = true;
+                let e_string = format!("LockSellError::InsufficientDefaultGoodQuantityAvailable");
+                let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                 "LockSellError::InsufficientDefaultGoodQuantityAvailable".to_string()
-            }
+            },
             Err(e) => {
                 let e_string = format!("{:?}",e);
+                let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone()))).send().await;
                 self.register.push(craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), false, Some(e_string)));
                 panic!("Error in lock_sell: {:?} in {}, since we are locking {} at {} with offer {}", e, market_name, goodkind, quantity, price);
             }
@@ -229,6 +246,7 @@ impl Trader_SA {
 
         if !bool_sell_error {
             self.register.push(craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), true, None));
+            let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
             //self.update_time();
             self.time += 1;
             //get the cash from the market
@@ -238,12 +256,14 @@ impl Trader_SA {
                 Ok(increase_eur) => increase_eur,
                 Err(e) => {
                     let e_string = format!("{:?}",e);
+                    let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone()))).send().await;
                     self.register.push(craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), false, Some(e_string)));
                     panic!("Error in sell in {:?}", e);
                 }
             };
 
             self.register.push(craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), true, None));
+            let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
             //self.update_time();
             self.time += 1;
 
@@ -500,7 +520,7 @@ impl Trader_SA {
                         panic!("Error in get_buy_price: {:?}", e);
                     }
                 };
-                self.buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name());
+                block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
             } else {
                 self.wait();
             }
@@ -571,7 +591,7 @@ impl Trader_SA {
                 /*if (original_budget > final_budget_pre_sell) {
                     break;
                 }*/
-                self.sell_from_market(market_name_sell,best_kind, best_quantity_sell, price_sell, self.get_trader_name());
+                block_on(self.sell_from_market(market_name_sell,best_kind, best_quantity_sell, price_sell, self.get_trader_name()));
 
             } else {
                 self.wait();
