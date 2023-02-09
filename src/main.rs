@@ -24,7 +24,7 @@ fn main() {
 
     let mut trader_sa = Trader_SA::new(_trader_name,1000.0, bfb.clone(), rcnz.clone(), zse.clone());
 
-    trader_sa.strategy(10);
+    trader_sa.strategy(1000000);
 
     //println!("{:?}", trader_sa.register);
 

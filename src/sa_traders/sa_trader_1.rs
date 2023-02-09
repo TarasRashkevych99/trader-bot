@@ -278,6 +278,8 @@ impl Trader_SA {
                 }
             }
         } else {
+            //let rt  = Runtime::new().unwrap();
+            //rt.block_on(self.wait(goodkind, quantity, price, market_name));
             self.wait(goodkind, quantity, price, market_name);
         }
     }
@@ -308,10 +310,11 @@ impl Trader_SA {
                         );
                     }
                 };
-
-                self.buy_from_market("BFB",kind_quantity_bfb,best_quantity_bfb,price, self.get_trader_name());
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.buy_from_market("BFB",kind_quantity_bfb,best_quantity_bfb,price, self.get_trader_name()));
             } else {
-                self.wait(kind_quantity_bfb, best_quantity_bfb, 0.0, "BFB");
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.wait(kind_quantity_bfb, best_quantity_bfb, 0.0, "BFB"));
             }
 
             let best_quantity_bfb_sell = self.find_best_sell_quantity(&self.bfb, kind_quantity_bfb.clone());
@@ -332,9 +335,11 @@ impl Trader_SA {
                 if (original_budget > final_budget_pre_sell) {
                     break;
                 }
-                self.sell_from_market("BFB",kind_quantity_bfb,best_quantity_bfb_sell,price_sell, self.get_trader_name());
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.sell_from_market("BFB",kind_quantity_bfb,best_quantity_bfb_sell,price_sell, self.get_trader_name()));
             } else {
-                self.wait(kind_quantity_bfb, best_quantity_bfb_sell, 0.0, "BFB");
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.wait(kind_quantity_bfb, best_quantity_bfb_sell, 0.0, "BFB"));
             }
 
             i -= 1;
@@ -363,9 +368,11 @@ impl Trader_SA {
                         );
                     }
                 };
-                self.buy_from_market("RCNZ", kind_quantity_rcnz, best_quantity_rcnz, price, self.get_trader_name());
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.buy_from_market("RCNZ", kind_quantity_rcnz, best_quantity_rcnz, price, self.get_trader_name()));
             } else {
-                self.wait(kind_quantity_rcnz, best_quantity_rcnz, 0.0, "RCNZ");
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.wait(kind_quantity_rcnz, best_quantity_rcnz, 0.0, "RCNZ"));
             }
 
             let best_quantity_rcnz_sell = self.find_best_sell_quantity(&self.rcnz, kind_quantity_rcnz.clone());
@@ -381,14 +388,17 @@ impl Trader_SA {
                         );
                     }
                 };
+
                 let final_budget_pre_sell = self.cash + price_sell;
                 println!("Now trader has {} euros", self.cash);
                 if (original_budget > final_budget_pre_sell) {
-                    break;
+                    //break;
                 }
-                self.sell_from_market("RCNZ",kind_quantity_rcnz, best_quantity_rcnz_sell, price_sell, self.get_trader_name());
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.sell_from_market("RCNZ",kind_quantity_rcnz, best_quantity_rcnz_sell, price_sell, self.get_trader_name()));
             } else {
-                self.wait(kind_quantity_rcnz, best_quantity_rcnz_sell, 0.0, "RCNZ");
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.wait(kind_quantity_rcnz, best_quantity_rcnz_sell, 0.0, "RCNZ"));
             }
 
             i -= 1;
@@ -415,9 +425,11 @@ impl Trader_SA {
                         );
                     }
                 };
-                self.buy_from_market("ZSE", kind_quantity_zse, best_quantity_zse, price, self.get_trader_name());
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.buy_from_market("ZSE", kind_quantity_zse, best_quantity_zse, price, self.get_trader_name()));
             } else {
-                self.wait(kind_quantity_zse, best_quantity_zse, 0.0, "ZSE");
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.wait(kind_quantity_zse, best_quantity_zse, 0.0, "ZSE"));
             }
 
             let best_quantity_zse_sell = self.find_best_sell_quantity(&self.zse, kind_quantity_zse.clone());
@@ -438,9 +450,11 @@ impl Trader_SA {
                 if (original_budget > final_budget_pre_sell) {
                     break;
                 }
-                self.sell_from_market("ZSE",kind_quantity_zse, best_quantity_zse_sell, price_sell, self.get_trader_name());
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.sell_from_market("ZSE",kind_quantity_zse, best_quantity_zse_sell, price_sell, self.get_trader_name()));
             } else {
-                self.wait(kind_quantity_zse, best_quantity_zse_sell, 0.0, "ZSE");
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.wait(kind_quantity_zse, best_quantity_zse_sell, 0.0, "ZSE"));
             }
 
             i -= 1;
@@ -526,7 +540,8 @@ impl Trader_SA {
 
                 rt.block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
             } else {
-                self.wait(best_kind, best_quantity, 0.0, market_name);
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.wait(best_kind, best_quantity, 0.0, market_name));
             }
 
             let best_quantity_bfb_sell = self.find_best_sell_quantity(&self.bfb, best_kind.clone());
@@ -599,7 +614,8 @@ impl Trader_SA {
                 rt.block_on(self.sell_from_market(market_name_sell,best_kind, best_quantity_sell, price_sell, self.get_trader_name()));
 
             } else {
-                self.wait(best_kind, best_quantity_sell, 0.0, market_name_sell);
+                let rt  = Runtime::new().unwrap();
+                rt.block_on(self.wait(best_kind, best_quantity_sell, 0.0, market_name_sell));
             }
             println!("Now trader has {} euros", self.cash);
             i -= 1;
