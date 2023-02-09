@@ -97,6 +97,28 @@ impl Trader_SA {
         self.time += 1;
     }
 
+    async fn send_labels(&mut self){
+        let client = reqwest::Client::new();
+        let labels_bfb = self.bfb.borrow().get_goods();
+        let labels_rcnz = self.rcnz.borrow().get_goods();
+        let labels_zse = self.zse.borrow().get_goods();
+        let _res = client
+            .post("http://localhost:8000/currentGoodLabels/".to_string() + "BFB")
+            .json(&labels_bfb)
+            .send()
+            .await;
+        let _res = client
+            .post("http://localhost:8000/currentGoodLabels/".to_string() + "RCNZ")
+            .json(&labels_rcnz)
+            .send()
+            .await;
+        let _res = client
+            .post("http://localhost:8000/currentGoodLabels/".to_string() + "ZSE")
+            .json(&labels_zse)
+            .send()
+            .await;
+    }
+
     //OTHER METHODS USED FOR STRATEGY:
 
     //function for finding how much of a product i can buy from a market given euros at disposal
@@ -155,15 +177,53 @@ impl Trader_SA {
 
         let client = reqwest::Client::new();
 
+        let mut bfb_market = &mut self.bfb;
+        let mut rcnz_market = &mut self.rcnz;
+        let mut zse_market = &mut self.zse;
 
+        let mut choosen_market;
+        let mut other_market_1;
+        let mut other_market_2;
+        let mut name_choosen_market = "";
+        let mut name_other_market_1 = "";
+        let mut name_other_market_2 = "";
+
+        match market_name{
+            "RCNZ" => {
+                choosen_market = rcnz_market;
+                name_choosen_market = choosen_market.borrow().get_name();
+                other_market_1 = bfb_market;
+                name_other_market_1 = "BFB";
+                other_market_2 = zse_market;
+                name_other_market_2 = choosen_market.borrow().get_name();
+            },
+            "ZSE" => {
+                choosen_market = zse_market;
+                name_choosen_market = choosen_market.borrow().get_name();
+                other_market_1 = bfb_market;
+                name_other_market_1 = "BFB";
+                other_market_2 = rcnz_market;
+                name_other_market_2 = choosen_market.borrow().get_name();
+            },
+            _ => {
+                choosen_market = bfb_market;
+                name_choosen_market = "BFB";
+                other_market_1 = rcnz_market;
+                name_other_market_1 = choosen_market.borrow().get_name();
+                other_market_2 = zse_market;
+                name_other_market_2 = choosen_market.borrow().get_name();
+            }
+        }
+
+/*
         let market = match market_name{
             "RCNZ" => &mut self.rcnz,
             "ZSE" => &mut self.zse,
             _ => &mut self.bfb
-        };
+        };*/
 
         let mut cash = Good::new(GoodKind::EUR, price);
-        let token = match market.borrow_mut().lock_buy(goodkind, quantity, price, trader_name) {
+        let token = match choosen_market.borrow_mut().lock_buy(goodkind, quantity, price, trader_name) {
                 Ok(token) => token,
                 Err(e) => {
                     let e_string = format!("{:?}",e);
@@ -176,11 +236,32 @@ impl Trader_SA {
         self.register.push(craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), true, None));
         let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
 
+        //self.send_labels();
+
+        let labels_1 = choosen_market.borrow().get_goods();
+        let labels_2 = other_market_1.borrow().get_goods();
+        let labels_3 = other_market_2.borrow().get_goods();
+        let _res = client
+            .post("http://localhost:8000/currentGoodLabels/".to_string() + name_choosen_market)
+            .json(&labels_1)
+            .send()
+            .await;
+        let _res = client
+            .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_1)
+            .json(&labels_2)
+            .send()
+            .await;
+        let _res = client
+            .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_2)
+            .json(&labels_3)
+            .send()
+            .await;
+
         //self.update_time();
         self.time += 1;
 
         //use the token to buy the good
-        let increase = match market.borrow_mut().buy(token, &mut cash) {
+        let increase = match choosen_market.borrow_mut().buy(token, &mut cash) {
             Ok(increase) => increase,
             Err(e) => {
                 let e_string = format!("{:?}",e);
@@ -193,6 +274,25 @@ impl Trader_SA {
         self.register.push(craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), true, None));
         let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
         //self.update_time();
+        let labels_1 = choosen_market.borrow().get_goods();
+        let labels_2 = other_market_1.borrow().get_goods();
+        let labels_3 = other_market_2.borrow().get_goods();
+        let _res = client
+            .post("http://localhost:8000/currentGoodLabels/".to_string() + name_choosen_market)
+            .json(&labels_1)
+            .send()
+            .await;
+        let _res = client
+            .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_1)
+            .json(&labels_2)
+            .send()
+            .await;
+        let _res = client
+            .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_2)
+            .json(&labels_3)
+            .send()
+            .await;
+
         self.time += 1;
 
         //now that we have bought the good from the market, now we have to change
@@ -212,16 +312,48 @@ impl Trader_SA {
 
         let client = reqwest::Client::new();
 
-        let market = match market_name{
-            "RCNZ" => &mut self.rcnz,
-            "ZSE" => &mut self.zse,
-            _ => &mut self.bfb
-        };
+        let mut bfb_market = &mut self.bfb;
+        let mut rcnz_market = &mut self.rcnz;
+        let mut zse_market = &mut self.zse;
+
+        let mut choosen_market;
+        let mut other_market_1;
+        let mut other_market_2;
+        let mut name_choosen_market = "";
+        let mut name_other_market_1 = "";
+        let mut name_other_market_2 = "";
+
+        match market_name{
+            "RCNZ" => {
+                choosen_market = rcnz_market;
+                name_choosen_market = choosen_market.borrow().get_name();
+                other_market_1 = bfb_market;
+                name_other_market_1 = "BFB";
+                other_market_2 = zse_market;
+                name_other_market_2 = choosen_market.borrow().get_name();
+            },
+            "ZSE" => {
+                choosen_market = zse_market;
+                name_choosen_market = choosen_market.borrow().get_name();
+                other_market_1 = bfb_market;
+                name_other_market_1 = "BFB";
+                other_market_2 = rcnz_market;
+                name_other_market_2 = choosen_market.borrow().get_name();
+            },
+            _ => {
+                choosen_market = bfb_market;
+                name_choosen_market = "BFB";
+                other_market_1 = rcnz_market;
+                name_other_market_1 = choosen_market.borrow().get_name();
+                other_market_2 = zse_market;
+                name_other_market_2 = choosen_market.borrow().get_name();
+            }
+        }
 
         let mut bool_sell_error = false;
 
         //get the token from lock_sell
-        let token_sell = match market.borrow_mut().lock_sell(goodkind, quantity, price, trader_name) {
+        let token_sell = match choosen_market.borrow_mut().lock_sell(goodkind, quantity, price, trader_name) {
             Ok(token_sell) => token_sell,
             Err(LockSellError::MaxAllowedLocksReached) => {
                 bool_sell_error = true;
@@ -248,12 +380,31 @@ impl Trader_SA {
         if !bool_sell_error {
             self.register.push(craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), true, None));
             let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
+            let labels_1 = choosen_market.borrow().get_goods();
+            let labels_2 = other_market_1.borrow().get_goods();
+            let labels_3 = other_market_2.borrow().get_goods();
+            let _res = client
+                .post("http://localhost:8000/currentGoodLabels/".to_string() + name_choosen_market)
+                .json(&labels_1)
+                .send()
+                .await;
+            let _res = client
+                .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_1)
+                .json(&labels_2)
+                .send()
+                .await;
+            let _res = client
+                .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_2)
+                .json(&labels_3)
+                .send()
+                .await;
+
             //self.update_time();
             self.time += 1;
             //get the cash from the market
             let mut sold_good = Good::new(goodkind, quantity);
             //println!("{}",sold_good.get_qty());
-            let increase_eur = match market.borrow_mut().sell(token_sell, &mut sold_good) {
+            let increase_eur = match choosen_market.borrow_mut().sell(token_sell, &mut sold_good) {
                 Ok(increase_eur) => increase_eur,
                 Err(e) => {
                     let e_string = format!("{:?}",e);
@@ -265,6 +416,24 @@ impl Trader_SA {
 
             self.register.push(craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), true, None));
             let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
+            let labels_1 = choosen_market.borrow().get_goods();
+            let labels_2 = other_market_1.borrow().get_goods();
+            let labels_3 = other_market_2.borrow().get_goods();
+            let _res = client
+                .post("http://localhost:8000/currentGoodLabels/".to_string() + name_choosen_market)
+                .json(&labels_1)
+                .send()
+                .await;
+            let _res = client
+                .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_1)
+                .json(&labels_2)
+                .send()
+                .await;
+            let _res = client
+                .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_2)
+                .json(&labels_3)
+                .send()
+                .await;
             //self.update_time();
             self.time += 1;
 
@@ -280,7 +449,34 @@ impl Trader_SA {
         } else {
             //let rt  = Runtime::new().unwrap();
             //rt.block_on(self.wait(goodkind, quantity, price, market_name));
-            self.wait(goodkind, quantity, price, market_name);
+            //self.wait(goodkind, quantity, price, market_name);
+
+            let client = reqwest::Client::new();
+            wait_one_day!(choosen_market);
+            wait_one_day!(other_market_1);
+            wait_one_day!(other_market_2);
+            self.register.push(craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None));
+            let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
+            self.time += 1;
+
+            let labels_1 = choosen_market.borrow().get_goods();
+            let labels_2 = other_market_1.borrow().get_goods();
+            let labels_3 = other_market_2.borrow().get_goods();
+            let _res = client
+                .post("http://localhost:8000/currentGoodLabels/".to_string() + name_choosen_market)
+                .json(&labels_1)
+                .send()
+                .await;
+            let _res = client
+                .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_1)
+                .json(&labels_2)
+                .send()
+                .await;
+            let _res = client
+                .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_2)
+                .json(&labels_3)
+                .send()
+                .await;
         }
     }
 
@@ -315,6 +511,7 @@ impl Trader_SA {
             } else {
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.wait(kind_quantity_bfb, best_quantity_bfb, 0.0, "BFB"));
+                rt.block_on(self.send_labels());
             }
 
             let best_quantity_bfb_sell = self.find_best_sell_quantity(&self.bfb, kind_quantity_bfb.clone());
@@ -340,6 +537,7 @@ impl Trader_SA {
             } else {
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.wait(kind_quantity_bfb, best_quantity_bfb_sell, 0.0, "BFB"));
+                rt.block_on(self.send_labels());
             }
 
             i -= 1;
@@ -373,6 +571,7 @@ impl Trader_SA {
             } else {
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.wait(kind_quantity_rcnz, best_quantity_rcnz, 0.0, "RCNZ"));
+                rt.block_on(self.send_labels());
             }
 
             let best_quantity_rcnz_sell = self.find_best_sell_quantity(&self.rcnz, kind_quantity_rcnz.clone());
@@ -399,6 +598,7 @@ impl Trader_SA {
             } else {
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.wait(kind_quantity_rcnz, best_quantity_rcnz_sell, 0.0, "RCNZ"));
+                rt.block_on(self.send_labels());
             }
 
             i -= 1;
@@ -430,6 +630,7 @@ impl Trader_SA {
             } else {
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.wait(kind_quantity_zse, best_quantity_zse, 0.0, "ZSE"));
+                rt.block_on(self.send_labels());
             }
 
             let best_quantity_zse_sell = self.find_best_sell_quantity(&self.zse, kind_quantity_zse.clone());
@@ -455,6 +656,7 @@ impl Trader_SA {
             } else {
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.wait(kind_quantity_zse, best_quantity_zse_sell, 0.0, "ZSE"));
+                rt.block_on(self.send_labels());
             }
 
             i -= 1;
@@ -538,10 +740,11 @@ impl Trader_SA {
 
                 let rt  = Runtime::new().unwrap();
 
-                rt.block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
+                rt.block_on(self.buy_from_market( market_name, best_kind, best_quantity, price, self.get_trader_name()));
             } else {
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.wait(best_kind, best_quantity, 0.0, market_name));
+                rt.block_on(self.send_labels());
             }
 
             let best_quantity_bfb_sell = self.find_best_sell_quantity(&self.bfb, best_kind.clone());
@@ -604,6 +807,12 @@ impl Trader_SA {
                         panic!("Error in get_sell_price in zse: {:?}", e);
                     }
                 };
+                let price_sell = match best_market_sell.borrow().get_sell_price(best_kind, best_quantity_sell) {
+                    Ok(price_sell) => price_sell,
+                    Err(e) => {
+                        panic!("Error in get_sell_price in zse: {:?}", e);
+                    }
+                };
 
                 let final_budget_pre_sell = self.cash + price_sell;
                 //println!("Now trader has {} euros", self.cash);
@@ -616,6 +825,7 @@ impl Trader_SA {
             } else {
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.wait(best_kind, best_quantity_sell, 0.0, market_name_sell));
+                rt.block_on(self.send_labels());
             }
             println!("Now trader has {} euros", self.cash);
             i -= 1;
