@@ -195,7 +195,7 @@ impl Trader_SA {
                 other_market_1 = bfb_market;
                 name_other_market_1 = "BFB";
                 other_market_2 = zse_market;
-                name_other_market_2 = choosen_market.borrow().get_name();
+                name_other_market_2 = other_market_2.borrow().get_name();
             },
             "ZSE" => {
                 choosen_market = zse_market;
@@ -203,15 +203,15 @@ impl Trader_SA {
                 other_market_1 = bfb_market;
                 name_other_market_1 = "BFB";
                 other_market_2 = rcnz_market;
-                name_other_market_2 = choosen_market.borrow().get_name();
+                name_other_market_2 = other_market_2.borrow().get_name();
             },
             _ => {
                 choosen_market = bfb_market;
                 name_choosen_market = "BFB";
                 other_market_1 = rcnz_market;
-                name_other_market_1 = choosen_market.borrow().get_name();
+                name_other_market_1 = other_market_1.borrow().get_name();
                 other_market_2 = zse_market;
-                name_other_market_2 = choosen_market.borrow().get_name();
+                name_other_market_2 = other_market_2.borrow().get_name();
             }
         }
 
@@ -330,7 +330,7 @@ impl Trader_SA {
                 other_market_1 = bfb_market;
                 name_other_market_1 = "BFB";
                 other_market_2 = zse_market;
-                name_other_market_2 = choosen_market.borrow().get_name();
+                name_other_market_2 = other_market_2.borrow().get_name();
             },
             "ZSE" => {
                 choosen_market = zse_market;
@@ -338,15 +338,15 @@ impl Trader_SA {
                 other_market_1 = bfb_market;
                 name_other_market_1 = "BFB";
                 other_market_2 = rcnz_market;
-                name_other_market_2 = choosen_market.borrow().get_name();
+                name_other_market_2 = other_market_2.borrow().get_name();
             },
             _ => {
                 choosen_market = bfb_market;
                 name_choosen_market = "BFB";
                 other_market_1 = rcnz_market;
-                name_other_market_1 = choosen_market.borrow().get_name();
+                name_other_market_1 = other_market_1.borrow().get_name();
                 other_market_2 = zse_market;
-                name_other_market_2 = choosen_market.borrow().get_name();
+                name_other_market_2 = other_market_2.borrow().get_name();
             }
         }
 
