@@ -21,6 +21,7 @@ pub struct Trader_TR {
     name: String,
     wallet: Wallet,
     register: Register,
+    initial_budget_in_euro: f32,
 }
 
 struct Register {
@@ -29,19 +30,20 @@ struct Register {
 }
 
 impl Trader_TR {
-    pub fn new(name: String) -> Self {
+    pub fn new(name: String, budget_per_good: f32) -> Self {
         Trader_TR {
             name,
             wallet: HashMap::from_iter(vec![
-                (GoodKind::EUR, 100.0),
-                (GoodKind::USD, 100.0),
-                (GoodKind::YUAN, 100.0),
-                (GoodKind::YEN, 100.0),
+                (GoodKind::EUR, budget_per_good),
+                (GoodKind::USD, budget_per_good),
+                (GoodKind::YUAN, budget_per_good),
+                (GoodKind::YEN, budget_per_good),
             ]),
             register: Register {
                 transactions: Vec::new(),
                 day: 0,
             },
+            initial_budget_in_euro: budget_per_good,
         }
     }
 
@@ -54,15 +56,17 @@ impl Trader_TR {
 
             let available_good_quantity_to_buy = self.get_market_good_quantity_by_kind(&market_to_buy_from, &good_kind);
 
-            if self.is_positive_and_big_enough(available_good_quantity_to_buy) {
+            if self.is_positive_and_big_enough(available_good_quantity_to_buy) && self.is_wallet_euro_balance_smaller_than_initial_euro_balance_after_buying(&market_to_buy_from, available_good_quantity_to_buy, &good_kind) {
                 let (good_quantity_to_buy, price_market_wants_to_be_paid) = self.calculate_optimal_purchase_option(Rc::clone(&market_to_buy_from), available_good_quantity_to_buy, good_kind.clone());
                 if !self.is_positive_and_big_enough(good_quantity_to_buy) {
+                    self.wait_for_one_day(bfb, rcnz, zse);
                     continue;
                 }
                 let lock_for_buying = market_to_buy_from.borrow_mut().lock_buy(good_kind.clone(), good_quantity_to_buy, price_market_wants_to_be_paid, self.name.clone());
                 self.register.day += 1;
                 if let Ok(token) = lock_for_buying {
                     let purchase = market_to_buy_from.borrow_mut().buy(token, &mut Good::new(GoodKind::EUR, price_market_wants_to_be_paid));
+                    // println!("Price market wants to be paid: {}, good quantity in the market {}", price_market_wants_to_be_paid, self.get)
                     if let Ok(good) = purchase {
                         println!("Purchased successfully {} of {} and paid {}", good.get_qty(), good.get_kind(), price_market_wants_to_be_paid);
                         self.update_internal_state_after_buying(&market_to_buy_from, price_market_wants_to_be_paid, good, "sold".to_string());
@@ -74,6 +78,7 @@ impl Trader_TR {
                 if self.is_positive_and_big_enough(available_quantity_to_pay_with) {
                     let (good_quantity_to_sell, price_market_has_to_pay) = self.calculate_optimal_sale_option(Rc::clone(&market_to_sell_to), available_quantity_to_pay_with, good_kind.clone(), good_quantity_to_buy);
                     if !self.is_positive_and_big_enough(good_quantity_to_sell) {
+                        self.wait_for_one_day(bfb, rcnz, zse);
                         continue;
                     }
                     let lock_for_selling = market_to_sell_to.borrow_mut().lock_sell(good_kind.clone(), good_quantity_to_sell, price_market_has_to_pay, self.name.clone());
@@ -88,8 +93,7 @@ impl Trader_TR {
                 }
             } else {
                 println!("Waiting for a day");
-                self.register.day += 1;
-                wait_one_day!(bfb, rcnz, zse);
+                self.wait_for_one_day(bfb, rcnz, zse);
             }
         }
     }
@@ -123,6 +127,20 @@ impl Trader_TR {
 
     fn is_positive_and_big_enough(&self, quantity: f32) -> bool {
         quantity > 0.0 && quantity > 1.0
+    }
+
+    fn wait_for_one_day(&mut self, bfb: &ChosenMarket, rcnz: &ChosenMarket, zse: &ChosenMarket) {
+        self.register.day += 1;
+        wait_one_day!(bfb, rcnz, zse);
+    }
+
+    // calculate_optimal_purchase_option always gives a pair that makes the trader earn money, but you only buy if
+    fn is_wallet_euro_balance_smaller_than_initial_euro_balance_after_buying(&self, market: &ChosenMarket, available_good_quantity_to_buy: f32, good_kind: &GoodKind) -> bool {
+        let (_, price_market_wants_to_be_paid) = self.calculate_optimal_purchase_option(Rc::clone(market), available_good_quantity_to_buy, good_kind.clone());
+        let mut wallet_euro_balance = self.get_money_by_kind(GoodKind::EUR);
+        wallet_euro_balance -= price_market_wants_to_be_paid;
+        println!("Wallet euro balance if buy: {}", wallet_euro_balance);
+        return wallet_euro_balance < self.initial_budget_in_euro
     }
 
     fn calculate_optimal_purchase_option(&self, market: ChosenMarket, available_good_quantity_to_buy: f32, good_kind: GoodKind) -> (f32, f32) {
@@ -230,7 +248,7 @@ impl Trader_TR {
     }
 
     fn get_market_good_label_by_kind(&self, market: &ChosenMarket, good_kind: &GoodKind) -> GoodLabel {
-        market.borrow().get_goods().iter().find(|(good)| good.good_kind == *good_kind).unwrap().to_owned()
+        market.borrow().get_goods().iter().find(|good| good.good_kind == *good_kind).unwrap().to_owned()
     }
 
     fn get_market_name(&self, market: &ChosenMarket) -> String {
@@ -245,7 +263,7 @@ mod test {
 
     #[test]
     fn test_get_money_by_kind() {
-        let mut trader = Trader_TR::new("RAST".to_string());
+        let mut trader = Trader_TR::new("RAST".to_string(), 100.0);
         assert_eq!(trader.get_money_by_kind(GoodKind::EUR), 100.0);
         assert_eq!(trader.get_money_by_kind(GoodKind::USD), 100.0);
         assert_eq!(trader.get_money_by_kind(GoodKind::YUAN), 100.0);
@@ -254,7 +272,7 @@ mod test {
 
     #[test]
     fn test_get_default_exchange_rates() {
-        let mut trader = Trader_TR::new("RAST".to_string());
+        let mut trader = Trader_TR::new("RAST".to_string(), 100.0);
         assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::EUR).unwrap(), &1.0);
         assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::USD).unwrap(), &DEFAULT_EUR_USD_EXCHANGE_RATE);
         assert_eq!(trader.get_default_exchange_rates().get(&GoodKind::YUAN).unwrap(), &DEFAULT_EUR_YUAN_EXCHANGE_RATE);
@@ -263,7 +281,7 @@ mod test {
 
     #[test]
     fn test_get_all_money_in_euro() {
-        let mut trader = Trader_TR::new("RAST".to_string());
+        let mut trader = Trader_TR::new("RAST".to_string(), 100.0);
         let mut total_amount = trader.get_money_by_kind(GoodKind::EUR) / 1.0;
         total_amount += trader.get_money_by_kind(GoodKind::USD) / DEFAULT_EUR_USD_EXCHANGE_RATE;
         total_amount += trader.get_money_by_kind(GoodKind::YUAN) / DEFAULT_EUR_YUAN_EXCHANGE_RATE;
