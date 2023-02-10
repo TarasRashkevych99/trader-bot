@@ -10,6 +10,13 @@ use ZSE::market::ZSE;
 use crate::sa_traders::log_event::{craft_log_event, CustomEventKind, LogEvent};
 use futures::executor::block_on;
 use tokio::runtime::Runtime;
+use serde::{Deserialize, Serialize};
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+struct TraderGood{
+    kind: GoodKind,
+    quantity: f32
+}
 
 
 //the struct for the trader
@@ -86,6 +93,17 @@ impl Trader_SA {
         }
     }
 
+    fn get_vec_trader_goods(&self) -> Vec<TraderGood>{
+        let mut tradergoods = vec![];
+
+        tradergoods.push(TraderGood{kind: GoodKind::EUR, quantity: self.get_trader_goodquantity(GoodKind::EUR)});
+        tradergoods.push(TraderGood{kind: GoodKind::USD, quantity: self.get_trader_goodquantity(GoodKind::USD)});
+        tradergoods.push(TraderGood{kind: GoodKind::YEN, quantity: self.get_trader_goodquantity(GoodKind::YEN)});
+        tradergoods.push(TraderGood{kind: GoodKind::YUAN, quantity: self.get_trader_goodquantity(GoodKind::YUAN)});
+
+        tradergoods
+    }
+
 
     async fn wait(&mut self, goodkind: GoodKind, quantity: f32, price: f32, market_name: &str){
         let client = reqwest::Client::new();
@@ -95,6 +113,20 @@ impl Trader_SA {
         self.register.push(craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None));
         let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
         self.time += 1;
+
+        self.send_labels();
+
+        let mut tradergoods = vec![];
+        tradergoods.push(TraderGood{kind: GoodKind::EUR, quantity: self.cash});
+        for goodkind in &self.goods{
+            tradergoods.push(TraderGood{kind: goodkind.borrow().get_kind().clone(), quantity: goodkind.borrow().get_qty()});
+        }
+        println!("{:?}",tradergoods);
+        let _res = client
+            .post("http://localhost:8000/traderGoods")
+            .json(&tradergoods)
+            .send()
+            .await;
     }
 
     async fn send_labels(&mut self){
@@ -257,6 +289,18 @@ impl Trader_SA {
             .send()
             .await;
 
+        let mut tradergoods = vec![];
+        tradergoods.push(TraderGood{kind: GoodKind::EUR, quantity: self.cash});
+        for goodkind in &self.goods{
+            tradergoods.push(TraderGood{kind: goodkind.borrow().get_kind().clone(), quantity: goodkind.borrow().get_qty()});
+        }
+        println!("{:?}",tradergoods);
+        let _res = client
+            .post("http://localhost:8000/traderGoods")
+            .json(&tradergoods)
+            .send()
+            .await;
+
         //self.update_time();
         self.time += 1;
 
@@ -290,6 +334,18 @@ impl Trader_SA {
         let _res = client
             .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_2)
             .json(&labels_3)
+            .send()
+            .await;
+
+        let mut tradergoods = vec![];
+        tradergoods.push(TraderGood{kind: GoodKind::EUR, quantity: self.cash});
+        for goodkind in &self.goods{
+            tradergoods.push(TraderGood{kind: goodkind.borrow().get_kind().clone(), quantity: goodkind.borrow().get_qty()});
+        }
+        println!("{:?}",tradergoods);
+        let _res = client
+            .post("http://localhost:8000/traderGoods")
+            .json(&tradergoods)
             .send()
             .await;
 
@@ -399,6 +455,18 @@ impl Trader_SA {
                 .send()
                 .await;
 
+            let mut tradergoods = vec![];
+            tradergoods.push(TraderGood{kind: GoodKind::EUR, quantity: self.cash});
+            for goodkind in &self.goods{
+                tradergoods.push(TraderGood{kind: goodkind.borrow().get_kind().clone(), quantity: goodkind.borrow().get_qty()});
+            }
+            println!("{:?}",tradergoods);
+            let _res = client
+                .post("http://localhost:8000/traderGoods")
+                .json(&tradergoods)
+                .send()
+                .await;
+
             //self.update_time();
             self.time += 1;
             //get the cash from the market
@@ -432,6 +500,19 @@ impl Trader_SA {
             let _res = client
                 .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_2)
                 .json(&labels_3)
+                .send()
+                .await;
+
+
+            let mut tradergoods = vec![];
+            tradergoods.push(TraderGood{kind: GoodKind::EUR, quantity: self.cash});
+            for goodkind in &self.goods{
+                tradergoods.push(TraderGood{kind: goodkind.borrow().get_kind().clone(), quantity: goodkind.borrow().get_qty()});
+            }
+            println!("{:?}",tradergoods);
+            let _res = client
+                .post("http://localhost:8000/traderGoods")
+                .json(&tradergoods)
                 .send()
                 .await;
             //self.update_time();
@@ -475,6 +556,18 @@ impl Trader_SA {
             let _res = client
                 .post("http://localhost:8000/currentGoodLabels/".to_string() + name_other_market_2)
                 .json(&labels_3)
+                .send()
+                .await;
+
+            let mut tradergoods = vec![];
+            tradergoods.push(TraderGood{kind: GoodKind::EUR, quantity: self.cash});
+            for goodkind in &self.goods{
+                tradergoods.push(TraderGood{kind: goodkind.borrow().get_kind().clone(), quantity: goodkind.borrow().get_qty()});
+            }
+            println!("{:?}",tradergoods);
+            let _res = client
+                .post("http://localhost:8000/traderGoods")
+                .json(&tradergoods)
                 .send()
                 .await;
         }
