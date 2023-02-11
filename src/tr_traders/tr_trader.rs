@@ -1,5 +1,6 @@
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::mem::take;
 use std::rc::Rc;
 use unitn_market_2022::good::consts::{DEFAULT_EUR_USD_EXCHANGE_RATE, DEFAULT_EUR_YEN_EXCHANGE_RATE, DEFAULT_EUR_YUAN_EXCHANGE_RATE};
 use unitn_market_2022::good::good::Good;
@@ -9,13 +10,16 @@ use unitn_market_2022::market::Market;
 use unitn_market_2022::wait_one_day;
 use rand::thread_rng;
 use rand::Rng;
+use futures::executor::block_on;
+use tokio::runtime::Runtime;
+use crate::common::visualizer::{craft_log_event, CustomEvent, CustomEventKind, TraderGood};
 
 
 type ChosenMarket = Rc<RefCell<dyn Market>>;
 type MarketName = String;
 type Action = String;
 type Wallet = HashMap<GoodKind, f32>;
-type Transactions = Vec<(i32, MarketName, Action, Good)>;
+type Transactions = Vec<(u32, MarketName, Action, Good)>;
 
 pub struct Trader_TR {
     name: String,
@@ -26,7 +30,7 @@ pub struct Trader_TR {
 
 struct Register {
     transactions: Transactions,
-    day: i32,
+    day: u32,
 }
 
 impl Trader_TR {
@@ -47,7 +51,8 @@ impl Trader_TR {
         }
     }
 
-    pub fn trade_with_all_markets(&mut self, bfb: &mut ChosenMarket, rcnz: &mut ChosenMarket, zse: &mut ChosenMarket, trading_days: i32) {
+    pub fn trade_with_all_markets(&mut self, bfb: &mut ChosenMarket, rcnz: &mut ChosenMarket, zse: &mut ChosenMarket, trading_days: u32) {
+        let run_time = Runtime::new().unwrap();
         loop {
             if self.register.day == trading_days {
                 break;
@@ -59,13 +64,30 @@ impl Trader_TR {
             if self.is_positive_and_big_enough(available_good_quantity_to_buy) && self.is_wallet_euro_balance_smaller_than_initial_euro_balance_after_buying(&market_to_buy_from, available_good_quantity_to_buy, &good_kind) {
                 let (good_quantity_to_buy, price_market_wants_to_be_paid) = self.calculate_optimal_purchase_option(Rc::clone(&market_to_buy_from), available_good_quantity_to_buy, good_kind.clone());
                 if !self.is_positive_and_big_enough(good_quantity_to_buy) {
-                    self.wait_for_one_day(bfb, rcnz, zse);
+                    run_time.block_on(self.send_trader_status());
+                    self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                    wait_one_day!(bfb, rcnz, zse);
+                    self.register.day += 1;
+                    run_time.block_on(self.send_trader_status());
+                    self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                    run_time.block_on(self.send_wait_event(good_kind, 0.0, &market_to_buy_from));
                     continue;
                 }
+                run_time.block_on(self.send_trader_status());
+                self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
                 let lock_for_buying = market_to_buy_from.borrow_mut().lock_buy(good_kind.clone(), good_quantity_to_buy, price_market_wants_to_be_paid, self.name.clone());
                 self.register.day += 1;
+                run_time.block_on(self.send_trader_status());
+                self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                run_time.block_on(self.send_lock_buy_event(good_kind, good_quantity_to_buy, &market_to_buy_from, price_market_wants_to_be_paid));
                 if let Ok(token) = lock_for_buying {
+                    run_time.block_on(self.send_trader_status());
+                    self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
                     let purchase = market_to_buy_from.borrow_mut().buy(token, &mut Good::new(GoodKind::EUR, price_market_wants_to_be_paid));
+                    self.register.day += 1;
+                    run_time.block_on(self.send_trader_status());
+                    self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                    run_time.block_on(self.send_buy_event(good_kind, good_quantity_to_buy, &market_to_buy_from, price_market_wants_to_be_paid));
                     // println!("Price market wants to be paid: {}, good quantity in the market {}", price_market_wants_to_be_paid, self.get)
                     if let Ok(good) = purchase {
                         println!("Purchased successfully {} of {} and paid {}", good.get_qty(), good.get_kind(), price_market_wants_to_be_paid);
@@ -78,13 +100,30 @@ impl Trader_TR {
                 if self.is_positive_and_big_enough(available_quantity_to_pay_with) {
                     let (good_quantity_to_sell, price_market_has_to_pay) = self.calculate_optimal_sale_option(Rc::clone(&market_to_sell_to), available_quantity_to_pay_with, good_kind.clone(), good_quantity_to_buy);
                     if !self.is_positive_and_big_enough(good_quantity_to_sell) {
-                        self.wait_for_one_day(bfb, rcnz, zse);
+                        run_time.block_on(self.send_trader_status());
+                        self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                        wait_one_day!(bfb, rcnz, zse);
+                        self.register.day += 1;
+                        run_time.block_on(self.send_trader_status());
+                        self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                        run_time.block_on(self.send_wait_event(good_kind, 0.0, &market_to_sell_to));
                         continue;
                     }
+                    run_time.block_on(self.send_trader_status());
+                    self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
                     let lock_for_selling = market_to_sell_to.borrow_mut().lock_sell(good_kind.clone(), good_quantity_to_sell, price_market_has_to_pay, self.name.clone());
                     self.register.day += 1;
+                    run_time.block_on(self.send_trader_status());
+                    self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                    run_time.block_on(self.send_lock_sell_event(good_kind, good_quantity_to_sell, &market_to_sell_to, price_market_has_to_pay));
                     if let Ok(token) = lock_for_selling {
+                        run_time.block_on(self.send_trader_status());
+                        self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
                         let sale = market_to_sell_to.borrow_mut().sell(token, &mut Good::new(good_kind.clone(), good_quantity_to_sell));
+                        self.register.day += 1;
+                        run_time.block_on(self.send_trader_status());
+                        self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                        run_time.block_on(self.send_sell_event(good_kind, good_quantity_to_sell, &market_to_sell_to, price_market_has_to_pay));
                         if let Ok(good) = sale {
                             println!("Sold successfully {} of {} and earned {}", good_quantity_to_sell, good_kind, price_market_has_to_pay);
                             self.update_internal_state_after_selling(&market_to_sell_to, good.get_qty(), Good::new(good_kind, good_quantity_to_sell), "bought".to_string());
@@ -93,9 +132,81 @@ impl Trader_TR {
                 }
             } else {
                 println!("Waiting for a day");
-                self.wait_for_one_day(bfb, rcnz, zse);
+                run_time.block_on(self.send_trader_status());
+                self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                wait_one_day!(bfb, rcnz, zse);
+                self.register.day += 1;
+                run_time.block_on(self.send_trader_status());
+                self.send_market_status_of_all_markets(&run_time, bfb, rcnz, zse);
+                run_time.block_on(self.send_wait_event(good_kind, 0.0, &market_to_buy_from));
             }
         }
+    }
+
+    async fn send_trader_status(&self) {
+        let client = reqwest::Client::new();
+        let trader_goods: Vec<TraderGood> = self.wallet
+            .iter()
+            .map(|(good_kind, quantity)| TraderGood { kind: *good_kind, quantity: *quantity })
+            .collect();
+        let _ = client.post("http://localhost:8000/traderGoods").json(&trader_goods).send().await;
+    }
+
+    async fn send_market_status_of_all_markets(&self, run_time: &Runtime, bfb: &mut ChosenMarket, rcnz: &mut ChosenMarket, zse: &mut ChosenMarket) {
+        run_time.block_on(self.send_market_status(bfb));
+        run_time.block_on(self.send_market_status(rcnz));
+        run_time.block_on(self.send_market_status(zse));
+    }
+
+
+    async fn send_market_status(&self, market: &ChosenMarket) {
+        let client = reqwest::Client::new();
+        let market_name_for_sending = self.get_market_name_for_sending(market);
+        let labels: Vec<GoodLabel> = market.borrow().get_goods();
+        let _res = client.post("http://localhost:8000/currentGoodLabels/".to_string() + &*market_name_for_sending).json(&labels).send().await;
+    }
+
+    async fn send_wait_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket) {
+        let client = reqwest::Client::new();
+        let market_name_for_sending = self.get_market_name_for_sending(market);
+        let log_event = craft_log_event(self.register.day, CustomEventKind::Wait, good_kind, quantity, 0.0, market_name_for_sending, true, None);
+        let _ = client.post("http://localhost:8000/log").json(&log_event).send().await;
+    }
+
+    async fn send_buy_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
+        let client = reqwest::Client::new();
+        let market_name_for_sending = self.get_market_name_for_sending(market);
+        let log_event = craft_log_event(self.register.day, CustomEventKind::Bought, good_kind, quantity, price, market_name_for_sending, true, None);
+        let _ = client.post("http://localhost:8000/log").json(&log_event).send().await;
+    }
+
+    async fn send_sell_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
+        let client = reqwest::Client::new();
+        let market_name_for_sending = self.get_market_name_for_sending(market);
+        let log_event = craft_log_event(self.register.day, CustomEventKind::Sold, good_kind, quantity, price, market_name_for_sending, true, None);
+        let _ = client.post("http://localhost:8000/log").json(&log_event).send().await;
+    }
+
+    async fn send_lock_buy_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
+        let client = reqwest::Client::new();
+        let market_name_for_sending = self.get_market_name_for_sending(market);
+        let log_event = craft_log_event(self.register.day, CustomEventKind::LockedBuy, good_kind, quantity, price, market_name_for_sending, true, None);
+        let _ = client.post("http://localhost:8000/log").json(&log_event).send().await;
+    }
+
+    async fn send_lock_sell_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
+        let client = reqwest::Client::new();
+        let market_name_for_sending = self.get_market_name_for_sending(market);
+        let log_event = craft_log_event(self.register.day, CustomEventKind::LockedSell, good_kind, quantity, price, market_name_for_sending, true, None);
+        let _ = client.post("http://localhost:8000/log").json(&log_event).send().await;
+    }
+
+    fn get_market_name_for_sending(&self, market: &ChosenMarket) -> String {
+        let market_name = self.get_market_name(market);
+        if market_name == "Baku stock exchange" {
+            return "BFB".to_string();
+        }
+        return market_name;
     }
 
     pub fn print_wallet_per_kind(&self) {
@@ -113,11 +224,11 @@ impl Trader_TR {
     pub fn print_register(&self) {
         println!("Register of {}", self.name);
         for (day, market_name, action, good) in self.register.transactions.iter() {
-            let mut to_form_pair = "to".to_string();
+            let mut to_from_pair = "to".to_string();
             if action == "bought" {
-                to_form_pair = "from".to_string();
+                to_from_pair = "from".to_string();
             }
-            println!("Day {}: {} {} {} {} {}", day, market_name, action, good, to_form_pair, self.name);
+            println!("Day {}: {} {} {} {} {}", day, market_name, action, good, to_from_pair, self.name);
         }
     }
 
@@ -129,18 +240,13 @@ impl Trader_TR {
         quantity > 0.0 && quantity > 1.0
     }
 
-    fn wait_for_one_day(&mut self, bfb: &ChosenMarket, rcnz: &ChosenMarket, zse: &ChosenMarket) {
-        self.register.day += 1;
-        wait_one_day!(bfb, rcnz, zse);
-    }
-
     // calculate_optimal_purchase_option always gives a pair that makes the trader earn money, but you only buy if
     fn is_wallet_euro_balance_smaller_than_initial_euro_balance_after_buying(&self, market: &ChosenMarket, available_good_quantity_to_buy: f32, good_kind: &GoodKind) -> bool {
         let (_, price_market_wants_to_be_paid) = self.calculate_optimal_purchase_option(Rc::clone(market), available_good_quantity_to_buy, good_kind.clone());
         let mut wallet_euro_balance = self.get_money_by_kind(GoodKind::EUR);
         wallet_euro_balance -= price_market_wants_to_be_paid;
         println!("Wallet euro balance if buy: {}", wallet_euro_balance);
-        return wallet_euro_balance < self.initial_budget_in_euro
+        return wallet_euro_balance < self.initial_budget_in_euro;
     }
 
     fn calculate_optimal_purchase_option(&self, market: ChosenMarket, available_good_quantity_to_buy: f32, good_kind: GoodKind) -> (f32, f32) {
@@ -196,14 +302,12 @@ impl Trader_TR {
     }
 
     fn update_internal_state_after_buying(&mut self, market: &ChosenMarket, amount: f32, good: Good, action: Action) {
-        self.register.day += 1;
         self.register.transactions.push((self.register.day, self.get_market_name(&market), action, good.clone()));
         self.wallet.insert(good.get_kind().clone(), self.get_money_by_kind(good.get_kind().clone()) + good.get_qty());
         self.wallet.insert(GoodKind::EUR, self.get_money_by_kind(GoodKind::EUR) - amount);
     }
 
     fn update_internal_state_after_selling(&mut self, market: &ChosenMarket, amount: f32, good: Good, action: Action) {
-        self.register.day += 1;
         self.register.transactions.push((self.register.day, self.get_market_name(&market), action, good.clone()));
         self.wallet.insert(good.get_kind().clone(), self.get_money_by_kind(good.get_kind().clone()) - good.get_qty());
         self.wallet.insert(GoodKind::EUR, self.get_money_by_kind(GoodKind::EUR) + amount);
