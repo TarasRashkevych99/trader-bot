@@ -256,7 +256,6 @@ impl Trader_TR {
         let (_, price_market_wants_to_be_paid) = self.calculate_optimal_purchase_option(Rc::clone(market), available_good_quantity_to_buy, good_kind.clone());
         let mut wallet_euro_balance = self.get_money_by_kind(GoodKind::EUR);
         wallet_euro_balance -= price_market_wants_to_be_paid;
-        println!("Wallet euro balance if buy: {}", wallet_euro_balance);
         return wallet_euro_balance < self.initial_budget_in_euro;
     }
 
