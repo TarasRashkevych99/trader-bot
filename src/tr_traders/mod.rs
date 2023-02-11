@@ -1,1 +1,1 @@
-pub mod tr_trader_1;
+pub mod tr_trader;
