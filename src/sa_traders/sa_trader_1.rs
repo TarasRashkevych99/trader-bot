@@ -12,6 +12,7 @@ use futures::executor::block_on;
 use tokio::runtime::Runtime;
 use serde::{Deserialize, Serialize};
 
+//TraderGood struct, necessary for sending data to visualizer
 #[derive(Serialize, Deserialize, Debug, Clone)]
 struct TraderGood{
     kind: GoodKind,
@@ -28,7 +29,6 @@ pub struct Trader_SA {
     pub bfb: Rc<RefCell<dyn Market>>,
     pub rcnz: Rc<RefCell<dyn Market>>,
     pub zse: Rc<RefCell<dyn Market>>,
-    pub register: Vec<LogEvent>,
     pub time: u32
 }
 
@@ -49,8 +49,7 @@ impl Trader_SA {
             bfb,
             rcnz,
             zse,
-            register: vec![],
-            time: 1
+            time: 0
         }
     }
 
@@ -71,10 +70,6 @@ impl Trader_SA {
         self.goods.clone()
     }
 
-    fn get_trader_register(&self) -> Vec<LogEvent>{
-        self.register.clone()
-    }
-
     //get the quantity of a certain good, EUR included
     fn get_trader_goodquantity(&self, goodkind: GoodKind) -> f32 {
         match goodkind {
@@ -93,24 +88,34 @@ impl Trader_SA {
         }
     }
 
-    fn get_vec_trader_goods(&self) -> Vec<TraderGood>{
+    //ASYNC METHODS:
+    //These methods are called when we need to call the API for the visualizer
+
+    //use this function when it is necessary to send the TraderGoods to the visualizer on wait events
+    async fn send_trader_goods(&self){
+        let client = reqwest::Client::new();
+
         let mut tradergoods = vec![];
-
-        tradergoods.push(TraderGood{kind: GoodKind::EUR, quantity: self.get_trader_goodquantity(GoodKind::EUR)});
-        tradergoods.push(TraderGood{kind: GoodKind::USD, quantity: self.get_trader_goodquantity(GoodKind::USD)});
-        tradergoods.push(TraderGood{kind: GoodKind::YEN, quantity: self.get_trader_goodquantity(GoodKind::YEN)});
-        tradergoods.push(TraderGood{kind: GoodKind::YUAN, quantity: self.get_trader_goodquantity(GoodKind::YUAN)});
-
-        tradergoods
+        tradergoods.push(TraderGood{kind: GoodKind::EUR, quantity: self.cash});
+        for goodkind in &self.goods{
+            tradergoods.push(TraderGood{kind: goodkind.borrow().get_kind().clone(), quantity: goodkind.borrow().get_qty()});
+        }
+        //println!("{:?}",tradergoods);
+        let _res = client
+            .post("http://localhost:8000/traderGoods")
+            .json(&tradergoods)
+            .send()
+            .await;
     }
 
-
+    //wait function, called on wait events
     async fn wait(&mut self, goodkind: GoodKind, quantity: f32, price: f32, market_name: &str){
         let client = reqwest::Client::new();
+
         wait_one_day!(self.bfb);
         wait_one_day!(self.rcnz);
         wait_one_day!(self.zse);
-        self.register.push(craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None));
+
         let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
         self.time += 1;
 
@@ -129,6 +134,7 @@ impl Trader_SA {
             .await;
     }
 
+    //use this function to send the GoodLabels of each market to the visualizer
     async fn send_labels(&mut self){
         let client = reqwest::Client::new();
         let labels_bfb = self.bfb.borrow().get_goods();
@@ -151,9 +157,9 @@ impl Trader_SA {
             .await;
     }
 
-    //OTHER METHODS USED FOR STRATEGY:
+    //METHODS USED FOR STRATEGY:
 
-    //function for finding how much of a product i can buy from a market given euros at disposal
+    //function for finding how much of any good i can buy from a market given euros at disposal
     pub fn find_best_buy_quantity(&self, market: &Rc<RefCell<dyn Market>>) -> (f32, GoodKind) {
         let mut best_quantity = 0.0;
         let mut best_kind = GoodKind::USD;
@@ -184,6 +190,7 @@ impl Trader_SA {
         (best_quantity, best_kind)
     }
 
+    //function for finding how much of a good i can sell to a market given the quantity of that good at disposal
     pub fn find_best_sell_quantity(&self, market: &Rc<RefCell<dyn Market>>, goodkind: GoodKind) -> f32 {
         let mut sell_price = 0.0;
         let mut eur_qty = 0.0;
@@ -205,6 +212,7 @@ impl Trader_SA {
         best_quantity
     }
 
+    //function for buying a good from a market
     pub async fn buy_from_market(&mut self, market_name: &str, goodkind: GoodKind, quantity: f32, price: f32, trader_name: String){
 
         let client = reqwest::Client::new();
@@ -259,13 +267,11 @@ impl Trader_SA {
                 Ok(token) => token,
                 Err(e) => {
                     let e_string = format!("{:?}",e);
-                    self.register.push(craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone())));
                     let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                     panic!("Error in lock_buy in {}: {:?}", market_name, e);
                 }
             };
 
-        self.register.push(craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), true, None));
         let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
 
         //self.send_labels();
@@ -309,13 +315,11 @@ impl Trader_SA {
             Ok(increase) => increase,
             Err(e) => {
                 let e_string = format!("{:?}",e);
-                self.register.push(craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone())));
                 let _res = client.post("http://http://127.0.0.1:8000//log").json(&craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                 panic!("Error in buy in bfb: {:?}", e);
             }
         };
 
-        self.register.push(craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), true, None));
         let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
         //self.update_time();
         let labels_1 = choosen_market.borrow().get_goods();
@@ -364,6 +368,7 @@ impl Trader_SA {
         }
     }
 
+    //function for selling a good to a market
     pub async fn sell_from_market(&mut self, market_name: &str, goodkind: GoodKind, quantity: f32, price: f32, trader_name: String){
 
         let client = reqwest::Client::new();
@@ -426,7 +431,6 @@ impl Trader_SA {
             Err(e) => {
                 let e_string = format!("{:?}",e);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone()))).send().await;
-                self.register.push(craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), false, Some(e_string)));
                 panic!("Error in lock_sell: {:?} in {}, since we are locking {} at {} with offer {}", e, market_name, goodkind, quantity, price);
             }
         };
@@ -434,7 +438,6 @@ impl Trader_SA {
 
 
         if !bool_sell_error {
-            self.register.push(craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), true, None));
             let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
             let labels_1 = choosen_market.borrow().get_goods();
             let labels_2 = other_market_1.borrow().get_goods();
@@ -477,12 +480,10 @@ impl Trader_SA {
                 Err(e) => {
                     let e_string = format!("{:?}",e);
                     let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone()))).send().await;
-                    self.register.push(craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), false, Some(e_string)));
                     panic!("Error in sell in {:?}", e);
                 }
             };
 
-            self.register.push(craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), true, None));
             let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
             let labels_1 = choosen_market.borrow().get_goods();
             let labels_2 = other_market_1.borrow().get_goods();
@@ -536,7 +537,6 @@ impl Trader_SA {
             wait_one_day!(choosen_market);
             wait_one_day!(other_market_1);
             wait_one_day!(other_market_2);
-            self.register.push(craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None));
             let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Wait, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
             self.time += 1;
 
@@ -576,191 +576,13 @@ impl Trader_SA {
 
     // BOT METHOD: apply bot strategy for i loop interactions
     //and returns the string with all the actions done by the trader
-    //with this function we only interact with one market
-    pub fn strategy_bfb(&mut self, mut i: i32) {
-        loop {
-            //loop until i reaches 0
-            if i <= 0 {
-                break;
-            }
-
-            let original_budget = self.cash;
-
-            let (best_quantity_bfb, kind_quantity_bfb) = self.find_best_buy_quantity(&self.bfb);
-
-
-            if best_quantity_bfb > 1.0 {
-                let price = match self.bfb.borrow().get_buy_price(kind_quantity_bfb, best_quantity_bfb) {
-                    Ok(price) => price,
-                    Err(e) => {
-                        panic!(
-                            "Error in get_buy_price in bfb: {:?}",
-                            e
-                        );
-                    }
-                };
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.buy_from_market("BFB",kind_quantity_bfb,best_quantity_bfb,price, self.get_trader_name()));
-            } else {
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.wait(kind_quantity_bfb, best_quantity_bfb, 0.0, "BFB"));
-                rt.block_on(self.send_labels());
-            }
-
-            let best_quantity_bfb_sell = self.find_best_sell_quantity(&self.bfb, kind_quantity_bfb.clone());
-
-            if best_quantity_bfb_sell > 1.0 {
-                //we repeat the same procedure we did for the buy part, but now we consider variables for selling
-                let price_sell = match self.bfb.borrow().get_sell_price(kind_quantity_bfb, best_quantity_bfb_sell) {
-                    Ok(price_sell) => price_sell,
-                    Err(e) => {
-                        panic!(
-                            "Error in get_sell_price in bfb: {:?}",
-                            e
-                        );
-                    }
-                };
-                let final_budget_pre_sell = self.cash + price_sell;
-                println!("Now trader has {} euros", self.cash);
-                if (original_budget > final_budget_pre_sell) {
-                    break;
-                }
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.sell_from_market("BFB",kind_quantity_bfb,best_quantity_bfb_sell,price_sell, self.get_trader_name()));
-            } else {
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.wait(kind_quantity_bfb, best_quantity_bfb_sell, 0.0, "BFB"));
-                rt.block_on(self.send_labels());
-            }
-
-            i -= 1;
-        }
-    }
-
-    //RCNZ
-    pub fn strategy_rcnz(&mut self, mut i: i32) {
-        loop {
-            //loop until i reaches 0
-            if i <= 0 {
-                break;
-            }
-
-            let original_budget = self.cash;
-            let (best_quantity_rcnz, kind_quantity_rcnz) = self.find_best_buy_quantity(&self.rcnz);
-            let mut best_quantity_rcnz = best_quantity_rcnz * 0.8;
-
-            if best_quantity_rcnz > 1.0 {
-                let price = match self.rcnz.borrow().get_buy_price(kind_quantity_rcnz, best_quantity_rcnz) {
-                    Ok(price) => price,
-                    Err(e) => {
-                        panic!(
-                            "Error in get_buy_price in rcnz: {:?}",
-                            e
-                        );
-                    }
-                };
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.buy_from_market("RCNZ", kind_quantity_rcnz, best_quantity_rcnz, price, self.get_trader_name()));
-            } else {
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.wait(kind_quantity_rcnz, best_quantity_rcnz, 0.0, "RCNZ"));
-                rt.block_on(self.send_labels());
-            }
-
-            let best_quantity_rcnz_sell = self.find_best_sell_quantity(&self.rcnz, kind_quantity_rcnz.clone());
-
-            if best_quantity_rcnz_sell > 1.0 {
-                //we repeat the same procedure we did for the buy part, but now we consider variables for selling
-                let price_sell = match self.rcnz.borrow().get_sell_price(kind_quantity_rcnz, best_quantity_rcnz_sell) {
-                    Ok(price_sell) => price_sell,
-                    Err(e) => {
-                        panic!(
-                            "Error in get_sell_price in rcnz: {:?}",
-                            e
-                        );
-                    }
-                };
-
-                let final_budget_pre_sell = self.cash + price_sell;
-                println!("Now trader has {} euros", self.cash);
-                if (original_budget > final_budget_pre_sell) {
-                    //break;
-                }
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.sell_from_market("RCNZ",kind_quantity_rcnz, best_quantity_rcnz_sell, price_sell, self.get_trader_name()));
-            } else {
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.wait(kind_quantity_rcnz, best_quantity_rcnz_sell, 0.0, "RCNZ"));
-                rt.block_on(self.send_labels());
-            }
-
-            i -= 1;
-        }
-    }
-
-    pub fn strategy_zse(&mut self, mut i: i32) {
-        loop {
-            //loop until i reaches 0
-            if i <= 0 {
-                break;
-            }
-
-            let original_budget = self.cash;
-            let (best_quantity_zse, kind_quantity_zse) = self.find_best_buy_quantity(&self.zse);
-
-            if best_quantity_zse > 1.0 {
-                let price = match self.zse.borrow().get_buy_price(kind_quantity_zse, best_quantity_zse) {
-                    Ok(price) => price,
-                    Err(e) => {
-                        panic!(
-                            "Error in get_buy_price in rcnz: {:?}",
-                            e
-                        );
-                    }
-                };
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.buy_from_market("ZSE", kind_quantity_zse, best_quantity_zse, price, self.get_trader_name()));
-            } else {
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.wait(kind_quantity_zse, best_quantity_zse, 0.0, "ZSE"));
-                rt.block_on(self.send_labels());
-            }
-
-            let best_quantity_zse_sell = self.find_best_sell_quantity(&self.zse, kind_quantity_zse.clone());
-
-            if best_quantity_zse_sell > 1.0 {
-                //we repeat the same procedure we did for the buy part, but now we consider variables for selling
-                let price_sell = match self.zse.borrow().get_sell_price(kind_quantity_zse, best_quantity_zse_sell) {
-                    Ok(price_sell) => price_sell,
-                    Err(e) => {
-                        panic!(
-                            "Error in get_sell_price in zse: {:?}",
-                            e
-                        );
-                    }
-                };
-                let final_budget_pre_sell = self.cash + price_sell;
-                println!("Now trader has {} euros", self.cash);
-                if (original_budget > final_budget_pre_sell) {
-                    break;
-                }
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.sell_from_market("ZSE",kind_quantity_zse, best_quantity_zse_sell, price_sell, self.get_trader_name()));
-            } else {
-                let rt  = Runtime::new().unwrap();
-                rt.block_on(self.wait(kind_quantity_zse, best_quantity_zse_sell, 0.0, "ZSE"));
-                rt.block_on(self.send_labels());
-            }
-
-            i -= 1;
-        }
-    }
-
-
-    // BOT METHOD: apply bot strategy for i loop interactions
-    //and returns the string with all the actions done by the trader
     //with this function we only interact with all markets
     pub fn strategy(&mut self, mut i: i32) {
+        //define Runtime object used for calling async functions
+        let rt  = Runtime::new().unwrap();
+        //initial call to the API, to visualize our initial wallet
+        rt.block_on(self.send_trader_goods());
+
         loop {
             //loop until i reaches 0
             if i <= 0 {
@@ -769,22 +591,26 @@ impl Trader_SA {
 
             let original_budget = self.cash;
 
+            //for each market get the best kind and quantity of good which could maximize profit
             let (best_quantity_bfb, kind_quantity_bfb) = self.find_best_buy_quantity(&self.bfb);
             let (best_quantity_rcnz, kind_quantity_rcnz) = self.find_best_buy_quantity(&self.rcnz);
             let (best_quantity_zse, kind_quantity_zse) = self.find_best_buy_quantity(&self.zse);
 
+            //define prices with kinds and quantity obtained previously
             let price_bfb = self.bfb.borrow_mut().get_buy_price(kind_quantity_bfb, best_quantity_bfb);
             let price_rcnz = self.rcnz.borrow_mut().get_buy_price(kind_quantity_rcnz, best_quantity_rcnz * 0.75);
             let price_zse = self.zse.borrow_mut().get_buy_price(kind_quantity_zse, best_quantity_zse);
 
+            //define variables for deciding the best buy operation
+            //in this case we prefer to trade with BFB market but if
+            //another market has better prices, we will buy from that market
             let mut min_buy_price = f32::MAX;
-
             let mut best_market = &self.bfb;
             let mut best_kind = kind_quantity_bfb;
             let mut best_quantity = best_quantity_bfb;
             let mut market_name = "BFB";
 
-
+            //choose the best market, based on the price we obtained
             match price_bfb{
                 Ok(_) => {
                     if min_buy_price > price_bfb.clone().unwrap(){
@@ -823,7 +649,10 @@ impl Trader_SA {
                 Err(_) => {}
             };
 
+            //check if the quantity is bigger than 1 and if at least one price is "ok"
+            //(i.e. it doesn't have an error as its output)
             if best_quantity > 1.0 && min_buy_price < f32::MAX{
+                //get the buy_price
                 let price = match best_market.borrow().get_buy_price(best_kind, best_quantity) {
                     Ok(price) => price,
                     Err(e) => {
@@ -832,22 +661,29 @@ impl Trader_SA {
                 };
 
                 let rt  = Runtime::new().unwrap();
-
+                //buy
                 rt.block_on(self.buy_from_market( market_name, best_kind, best_quantity, price, self.get_trader_name()));
             } else {
                 let rt  = Runtime::new().unwrap();
+                //wait
                 rt.block_on(self.wait(best_kind, best_quantity, 0.0, market_name));
-                rt.block_on(self.send_labels());
+                //rt.block_on(self.send_labels());
             }
 
+            //for each market get the best quantity of good which could maximize profit
+            //in this case we will sell the same good, hoping that we can do profit
             let best_quantity_bfb_sell = self.find_best_sell_quantity(&self.bfb, best_kind.clone());
             let best_quantity_rcnz_sell = self.find_best_sell_quantity(&self.rcnz, best_kind.clone());
             let best_quantity_zse_sell = self.find_best_sell_quantity(&self.zse, best_kind.clone());
 
+            //define prices with kinds and quantity obtained previously
             let price_sell_bfb = self.bfb.borrow_mut().get_sell_price(best_kind, best_quantity_bfb_sell);
             let price_sellrcnz = self.rcnz.borrow_mut().get_sell_price(best_kind, best_quantity_rcnz_sell * 0.7);
             let price_sell_zse = self.zse.borrow_mut().get_sell_price(best_kind, best_quantity_zse_sell);
 
+            //define variables for deciding the best sell operation
+            //in this case we prefer to trade with BFB market but if
+            //another market has better prices, we will buy from that market
             let mut max_sell_price = 0.0;
             let mut best_market_sell = &self.bfb;
             let mut best_quantity_sell = best_quantity_bfb_sell;
@@ -864,7 +700,6 @@ impl Trader_SA {
                 }
                 Err(_) => {}
             };
-
 
             match price_sellrcnz{
                 Ok(_) => {
@@ -890,16 +725,10 @@ impl Trader_SA {
                 Err(_) => {}
             };
 
-
-
+            //check if the quantity is bigger than 1 and if at least one price is "ok"
+            //(i.e. it doesn't have an error as its output)
             if best_quantity_sell > 1.0 && max_sell_price > 0.0{
                 //we repeat the same procedure we did for the buy part, but now we consider variables for selling
-                let price_sell = match best_market_sell.borrow().get_sell_price(best_kind, best_quantity_sell) {
-                    Ok(price_sell) => price_sell,
-                    Err(e) => {
-                        panic!("Error in get_sell_price in zse: {:?}", e);
-                    }
-                };
                 let price_sell = match best_market_sell.borrow().get_sell_price(best_kind, best_quantity_sell) {
                     Ok(price_sell) => price_sell,
                     Err(e) => {
@@ -912,14 +741,17 @@ impl Trader_SA {
                 /*if (original_budget > final_budget_pre_sell) {
                     break;
                 }*/
+                //sell
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.sell_from_market(market_name_sell,best_kind, best_quantity_sell, price_sell, self.get_trader_name()));
 
             } else {
+                //wait
                 let rt  = Runtime::new().unwrap();
                 rt.block_on(self.wait(best_kind, best_quantity_sell, 0.0, market_name_sell));
-                rt.block_on(self.send_labels());
+                //rt.block_on(self.send_labels());
             }
+
             println!("Now trader has {} euros", self.cash);
             i -= 1;
         }

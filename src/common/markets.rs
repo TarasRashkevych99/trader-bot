@@ -6,7 +6,6 @@ use RCNZ::RCNZ;
 use ZSE::market::ZSE;
 
 // function for generating the three markets with random good quantities
-// **Sabin Andone**
 pub fn new_random() -> (Rc<RefCell<dyn Market>>, Rc<RefCell<dyn Market>>, Rc<RefCell<dyn Market>>) {
     (BFB::new_random(),
      RCNZ::new_random(),
@@ -14,7 +13,6 @@ pub fn new_random() -> (Rc<RefCell<dyn Market>>, Rc<RefCell<dyn Market>>, Rc<Ref
 }
 
 // function for generating the three markets with fixed good quantities
-// **Sabin Andone**
 pub fn new_with_quantities(eur: f32, yen: f32, usd: f32, yuan: f32) -> (Rc<RefCell<dyn Market>>, Rc<RefCell<dyn Market>>, Rc<RefCell<dyn Market>>) {
     (BFB::new_with_quantities(eur, yen, usd, yuan),
      RCNZ::new_with_quantities(eur, yen, usd, yuan),
@@ -33,7 +31,6 @@ pub fn print_markets(title: &str, bfb: &Rc<RefCell<dyn Market>>, rcnz: &Rc<RefCe
 }
 
 // function that prints the quantities of each good for each market
-// **Sabin Andone**
 fn print_quantities(market: &Rc<RefCell<dyn Market>>) {
     let market = market.borrow_mut();
     let goods = market.get_goods();
@@ -42,13 +39,4 @@ fn print_quantities(market: &Rc<RefCell<dyn Market>>) {
     for i in 0..goods.len() {
         println!("{:?}", goods[i]);
     }
-}
-
-//function to print the results obtained from the trader's actions
-pub fn print_results(result: Vec<String>) {
-
-    for i in result.iter(){
-        println!("{}", i);
-    }
-
 }
