@@ -12,7 +12,8 @@ use rand::thread_rng;
 use rand::Rng;
 use futures::executor::block_on;
 use tokio::runtime::Runtime;
-use crate::common::visualizer::{craft_log_event, CustomEvent, CustomEventKind, TraderGood};
+use crate::common;
+use crate::common::visualizer::{craft_log_event, CustomEvent, CustomEventKind, TraderGood, wait_before_calling_api};
 
 
 type ChosenMarket = Rc<RefCell<dyn Market>>;
@@ -170,7 +171,13 @@ impl Trader_TR {
         }
     }
 
+    fn wait_before_calling_api(&self) {
+        let trader_config = common::trader_config::get_trader_config();
+        wait_before_calling_api(trader_config.get_delay_in_milliseconds());
+    }
+
     async fn send_trader_status(&self) {
+        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let trader_goods: Vec<TraderGood> = self.wallet
             .iter()
@@ -187,6 +194,7 @@ impl Trader_TR {
     }
 
     async fn send_wait_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket) {
+        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::Wait, good_kind, quantity, 0.0, market_name_for_sending, true, None);
@@ -194,6 +202,7 @@ impl Trader_TR {
     }
 
     async fn send_buy_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
+        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::Bought, good_kind, quantity, price, market_name_for_sending, true, None);
@@ -201,6 +210,7 @@ impl Trader_TR {
     }
 
     async fn send_sell_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
+        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::Sold, good_kind, quantity, price, market_name_for_sending, true, None);
@@ -208,6 +218,7 @@ impl Trader_TR {
     }
 
     async fn send_lock_buy_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
+        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::LockedBuy, good_kind, quantity, price, market_name_for_sending, true, None);
@@ -215,6 +226,7 @@ impl Trader_TR {
     }
 
     async fn send_lock_sell_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
+        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::LockedSell, good_kind, quantity, price, market_name_for_sending, true, None);
