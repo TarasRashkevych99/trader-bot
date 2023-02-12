@@ -65,41 +65,56 @@ impl Trader_TR {
             if self.is_positive_and_big_enough(available_good_quantity_to_buy) && self.is_wallet_euro_balance_smaller_than_initial_euro_balance_after_buying(&market_to_buy_from, available_good_quantity_to_buy, &good_kind) {
                 let (good_quantity_to_buy, price_market_wants_to_be_paid) = self.calculate_optimal_purchase_option(Rc::clone(&market_to_buy_from), available_good_quantity_to_buy, good_kind.clone());
                 if !self.is_positive_and_big_enough(good_quantity_to_buy) {
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_trader_status());
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_market_status(bfb));
                     run_time.block_on(self.send_market_status(rcnz));
                     run_time.block_on(self.send_market_status(zse));
                     wait_one_day!(bfb, rcnz, zse);
                     self.register.day += 1;
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_trader_status());
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_market_status(bfb));
                     run_time.block_on(self.send_market_status(rcnz));
                     run_time.block_on(self.send_market_status(zse));
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_wait_event(good_kind, 0.0, &market_to_buy_from));
                     continue;
                 }
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_trader_status());
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_market_status(bfb));
                 run_time.block_on(self.send_market_status(rcnz));
                 run_time.block_on(self.send_market_status(zse));
                 let lock_for_buying = market_to_buy_from.borrow_mut().lock_buy(good_kind.clone(), good_quantity_to_buy, price_market_wants_to_be_paid, self.name.clone());
                 self.register.day += 1;
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_trader_status());
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_market_status(bfb));
                 run_time.block_on(self.send_market_status(rcnz));
                 run_time.block_on(self.send_market_status(zse));
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_lock_buy_event(good_kind, good_quantity_to_buy, &market_to_buy_from, price_market_wants_to_be_paid));
                 if let Ok(token) = lock_for_buying {
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_trader_status());
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_market_status(bfb));
                     run_time.block_on(self.send_market_status(rcnz));
                     run_time.block_on(self.send_market_status(zse));
                     let purchase = market_to_buy_from.borrow_mut().buy(token, &mut Good::new(GoodKind::EUR, price_market_wants_to_be_paid));
                     self.register.day += 1;
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_trader_status());
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_market_status(bfb));
                     run_time.block_on(self.send_market_status(rcnz));
                     run_time.block_on(self.send_market_status(zse));
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_buy_event(good_kind, good_quantity_to_buy, &market_to_buy_from, price_market_wants_to_be_paid));
                     if let Ok(good) = purchase {
                         println!("Purchased successfully {} of {} and paid {}", good.get_qty(), good.get_kind(), price_market_wants_to_be_paid);
@@ -112,41 +127,55 @@ impl Trader_TR {
                 if self.is_positive_and_big_enough(available_quantity_to_pay_with) {
                     let (good_quantity_to_sell, price_market_has_to_pay) = self.calculate_optimal_sale_option(Rc::clone(&market_to_sell_to), available_quantity_to_pay_with, good_kind.clone(), good_quantity_to_buy);
                     if !self.is_positive_and_big_enough(good_quantity_to_sell) {
+                        run_time.block_on(self.wait_before_calling_api());
                         run_time.block_on(self.send_trader_status());
+                        run_time.block_on(self.wait_before_calling_api());
                         run_time.block_on(self.send_market_status(bfb));
                         run_time.block_on(self.send_market_status(rcnz));
                         run_time.block_on(self.send_market_status(zse));
                         wait_one_day!(bfb, rcnz, zse);
                         self.register.day += 1;
+                        run_time.block_on(self.wait_before_calling_api());
                         run_time.block_on(self.send_trader_status());
+                        run_time.block_on(self.wait_before_calling_api());
                         run_time.block_on(self.send_market_status(bfb));
                         run_time.block_on(self.send_market_status(rcnz));
                         run_time.block_on(self.send_market_status(zse));
+                        run_time.block_on(self.wait_before_calling_api());
                         run_time.block_on(self.send_wait_event(good_kind, 0.0, &market_to_sell_to));
                         continue;
                     }
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_trader_status());
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_market_status(bfb));
                     run_time.block_on(self.send_market_status(rcnz));
                     run_time.block_on(self.send_market_status(zse));
                     let lock_for_selling = market_to_sell_to.borrow_mut().lock_sell(good_kind.clone(), good_quantity_to_sell, price_market_has_to_pay, self.name.clone());
                     self.register.day += 1;
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_trader_status());
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_market_status(bfb));
                     run_time.block_on(self.send_market_status(rcnz));
                     run_time.block_on(self.send_market_status(zse));
+                    run_time.block_on(self.wait_before_calling_api());
                     run_time.block_on(self.send_lock_sell_event(good_kind, good_quantity_to_sell, &market_to_sell_to, price_market_has_to_pay));
                     if let Ok(token) = lock_for_selling {
+                        run_time.block_on(self.wait_before_calling_api());
                         run_time.block_on(self.send_trader_status());
+                        run_time.block_on(self.wait_before_calling_api());
                         run_time.block_on(self.send_market_status(bfb));
                         run_time.block_on(self.send_market_status(rcnz));
                         run_time.block_on(self.send_market_status(zse));
                         let sale = market_to_sell_to.borrow_mut().sell(token, &mut Good::new(good_kind.clone(), good_quantity_to_sell));
                         self.register.day += 1;
                         run_time.block_on(self.send_trader_status());
+                        run_time.block_on(self.wait_before_calling_api());
                         run_time.block_on(self.send_market_status(bfb));
                         run_time.block_on(self.send_market_status(rcnz));
                         run_time.block_on(self.send_market_status(zse));
+                        run_time.block_on(self.wait_before_calling_api());
                         run_time.block_on(self.send_sell_event(good_kind, good_quantity_to_sell, &market_to_sell_to, price_market_has_to_pay));
                         if let Ok(good) = sale {
                             println!("Sold successfully {} of {} and earned {}", good_quantity_to_sell, good_kind, price_market_has_to_pay);
@@ -156,28 +185,40 @@ impl Trader_TR {
                 }
             } else {
                 println!("Waiting for a day");
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_trader_status());
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_market_status(bfb));
                 run_time.block_on(self.send_market_status(rcnz));
                 run_time.block_on(self.send_market_status(zse));
                 wait_one_day!(bfb, rcnz, zse);
                 self.register.day += 1;
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_trader_status());
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_market_status(bfb));
                 run_time.block_on(self.send_market_status(rcnz));
                 run_time.block_on(self.send_market_status(zse));
+                run_time.block_on(self.wait_before_calling_api());
                 run_time.block_on(self.send_wait_event(good_kind, 0.0, &market_to_buy_from));
             }
         }
     }
 
-    fn wait_before_calling_api(&self) {
-        let trader_config = common::trader_config::get_trader_config();
-        wait_before_calling_api(trader_config.get_delay_in_milliseconds());
+    async fn wait_before_calling_api(&self) {
+        let delay = self.get_delay_in_milliseconds().await;
+        wait_before_calling_api(delay);
+    }
+
+    async fn get_delay_in_milliseconds(&self) -> u64 {
+        let client = reqwest::Client::new();
+        let res = client.get("http://localhost:8000/delay").send().await.unwrap();
+        let body = res.text().await.unwrap();
+        let delay_in_milliseconds: u64 = body.parse().unwrap();
+        return delay_in_milliseconds;
     }
 
     async fn send_trader_status(&self) {
-        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let trader_goods: Vec<TraderGood> = self.wallet
             .iter()
@@ -190,11 +231,10 @@ impl Trader_TR {
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let labels: Vec<GoodLabel> = market.borrow().get_goods();
-        let _res = client.post("http://localhost:8000/currentGoodLabels/".to_string() + &*market_name_for_sending).json(&labels).send().await;
+        let _ = client.post("http://localhost:8000/currentGoodLabels/".to_string() + &*market_name_for_sending).json(&labels).send().await;
     }
 
     async fn send_wait_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket) {
-        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::Wait, good_kind, quantity, 0.0, market_name_for_sending, true, None);
@@ -202,7 +242,6 @@ impl Trader_TR {
     }
 
     async fn send_buy_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
-        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::Bought, good_kind, quantity, price, market_name_for_sending, true, None);
@@ -210,7 +249,6 @@ impl Trader_TR {
     }
 
     async fn send_sell_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
-        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::Sold, good_kind, quantity, price, market_name_for_sending, true, None);
@@ -218,7 +256,6 @@ impl Trader_TR {
     }
 
     async fn send_lock_buy_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
-        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::LockedBuy, good_kind, quantity, price, market_name_for_sending, true, None);
@@ -226,7 +263,6 @@ impl Trader_TR {
     }
 
     async fn send_lock_sell_event(&mut self, good_kind: GoodKind, quantity: f32, market: &ChosenMarket, price: f32) {
-        self.wait_before_calling_api();
         let client = reqwest::Client::new();
         let market_name_for_sending = self.get_market_name_for_sending(market);
         let log_event = craft_log_event(self.register.day, CustomEventKind::LockedSell, good_kind, quantity, price, market_name_for_sending, true, None);
