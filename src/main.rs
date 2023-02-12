@@ -25,13 +25,11 @@ fn main() {
         trader_tr.print_register();
         print_markets("Markets with random quantities", &bfb, &rcnz, &zse);
     } else if trader_config.is_trader_SA() {
-        let mut trader_sa = Trader_SA::new(10000.0, bfb.clone(), rcnz.clone(), zse.clone());
+        let mut trader_sa = Trader_SA::new("RAST".to_string(), trader_config.get_budget(), bfb.clone(), rcnz.clone(), zse.clone());
 
-        let result = trader_sa.strategy(3);
+        trader_sa.strategy(trader_config.get_trading_days());
 
-        print_results(result);
-
-        print_markets("Markets after with fixed quantities", &bfb, &rcnz, &zse);
+        print_markets("Markets after with random quantities", &bfb, &rcnz, &zse);
     } else if trader_config.is_trader_AB() {
         // trader di Alfredo
     }
