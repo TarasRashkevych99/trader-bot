@@ -48,3 +48,7 @@ pub struct TraderGood {
     pub kind: GoodKind,
     pub quantity: f32,
 }
+
+pub fn wait_before_calling_api(milliseconds: u64) {
+    std::thread::sleep(std::time::Duration::from_millis(milliseconds));
+}
