@@ -98,7 +98,7 @@ impl Trader_SA {
             tradergoods.push(TraderGood{kind: goodkind.borrow().get_kind().clone(), quantity: goodkind.borrow().get_qty()});
         }
         //println!("{:?}",tradergoods);
-        wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+        wait_before_calling_api(self.get_delay_in_milliseconds().await);
         let _res = client
             .post("http://localhost:8000/traderGoods")
             .json(&tradergoods)
@@ -112,7 +112,7 @@ impl Trader_SA {
 
         wait_one_day!(self.bfb, self.rcnz, self.zse);
 
-        wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+        wait_before_calling_api(self.get_delay_in_milliseconds().await);
         let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Wait, goodkind, 0.0, 0.0, market_name.to_string(), true, None)).send().await;
         self.time += 1;
     }
@@ -123,7 +123,7 @@ impl Trader_SA {
         let labels_bfb = self.bfb.borrow().get_goods();
         let labels_rcnz = self.rcnz.borrow().get_goods();
         let labels_zse = self.zse.borrow().get_goods();
-        wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+        wait_before_calling_api(self.get_delay_in_milliseconds().await);
         let _res = client
             .post("http://localhost:8000/currentGoodLabels/".to_string() + "BFB")
             .json(&labels_bfb)
@@ -139,6 +139,15 @@ impl Trader_SA {
             .json(&labels_zse)
             .send()
             .await;
+    }
+
+    //method for getting delay
+    async fn get_delay_in_milliseconds(&self) -> u64 {
+        let client = reqwest::Client::new();
+        let res = client.get("http://localhost:8000/delay").send().await.unwrap();
+        let body = res.text().await.unwrap();
+        let delay_in_milliseconds: u64 = body.parse().unwrap();
+        return delay_in_milliseconds;
     }
 
     //METHODS USED FOR STRATEGY:
@@ -208,14 +217,14 @@ impl Trader_SA {
 
         match market.borrow_mut().lock_buy(goodkind, quantity, price, trader_name) {
             Ok(token) => {
-                wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
                 self.time += 1;
                 Ok(token)
             },
             Err(e) => {
                 let e_string = format!("{:?}",e);
-                wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                 Err(e)
             }
@@ -237,7 +246,7 @@ impl Trader_SA {
         //use the token to buy the good
         match market.borrow_mut().buy(token, &mut Good::new(GoodKind::EUR, price)) {
             Ok(increase) => {
-                wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
                 self.time += 1;
                 //now that we have bought the good from the market, now we have to change
@@ -254,7 +263,7 @@ impl Trader_SA {
             },
             Err(e) => {
                 let e_string = format!("{:?}",e);
-                wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://http://127.0.0.1:8000//log").json(&craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
             }
         };
@@ -272,14 +281,14 @@ impl Trader_SA {
 
         match market.borrow_mut().lock_sell(goodkind, quantity, price, trader_name) {
             Ok(token) => {
-                wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
                 self.time += 1;
                 Ok(token)
             },
             Err(e) => {
                 let e_string = format!("{:?}",e);
-                wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                 Err(e)
             }
@@ -301,7 +310,7 @@ impl Trader_SA {
             //use the token to sell the good
             match market.borrow_mut().sell(token, &mut Good::new(goodkind.clone(), quantity)) {
                 Ok(increase_eur) => {
-                    wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+                    //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                     let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
                     self.time += 1;
                     //now that we have sold the good to the market, now we have to change
@@ -318,7 +327,7 @@ impl Trader_SA {
                 },
                 Err(e) => {
                     let e_string = format!("{:?}",e);
-                    wait_before_calling_api(common::trader_config::get_trader_config().get_delay_in_milliseconds());
+                    //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                     let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone()))).send().await;
                 }
             };
@@ -407,12 +416,14 @@ impl Trader_SA {
                 };
 
                 //do the lock_buy
+                wait_before_calling_api(rt.block_on(self.get_delay_in_milliseconds()));
                 let token = rt.block_on(self.lock_buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
 
                 if let Ok(token) = token{
                     //buy
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    wait_before_calling_api(rt.block_on(self.get_delay_in_milliseconds()));
                     rt.block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, token));
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
@@ -420,6 +431,7 @@ impl Trader_SA {
 
             } else {
                 //wait
+                wait_before_calling_api(rt.block_on(self.get_delay_in_milliseconds()));
                 rt.block_on(self.wait(best_kind, 0.0, 0.0, market_name));
                 rt.block_on(self.send_labels());
                 rt.block_on(self.send_trader_goods());
@@ -490,18 +502,21 @@ impl Trader_SA {
                 };
 
                 //do the lock_sell
+                wait_before_calling_api(rt.block_on(self.get_delay_in_milliseconds()));
                 let token = rt.block_on(self.lock_sell_to_market(market_name_sell,best_kind, best_quantity_sell, price_sell, self.get_trader_name()));
 
                 if let Ok(token) = token{
                     //sell
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    wait_before_calling_api(rt.block_on(self.get_delay_in_milliseconds()));
                     rt.block_on(self.sell_to_market(market_name_sell,best_kind, best_quantity_sell, price_sell, token));
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
                 }
             } else {
                 //wait
+                wait_before_calling_api(rt.block_on(self.get_delay_in_milliseconds()));
                 rt.block_on(self.wait(best_kind, 0.0, 0.0, market_name_sell));
                 rt.block_on(self.send_labels());
                 rt.block_on(self.send_trader_goods());
