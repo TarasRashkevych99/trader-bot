@@ -54,6 +54,14 @@ impl Trader_TR {
 
     pub fn trade_with_all_markets(&mut self, bfb: &mut ChosenMarket, rcnz: &mut ChosenMarket, zse: &mut ChosenMarket, trading_days: u32) {
         let run_time = Runtime::new().unwrap();
+
+        run_time.block_on(self.wait_before_calling_api());
+        run_time.block_on(self.send_trader_status());
+        run_time.block_on(self.wait_before_calling_api());
+        run_time.block_on(self.send_market_status(bfb));
+        run_time.block_on(self.send_market_status(rcnz));
+        run_time.block_on(self.send_market_status(zse));
+
         loop {
             if self.register.day == trading_days {
                 break;
