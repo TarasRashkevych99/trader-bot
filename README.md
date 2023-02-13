@@ -104,7 +104,40 @@ If the checks that we have done for the if part result being false, then we need
  continue;            
 ```
              
-The selling part follows an approach similar to the buying part, except for the fact that now we have to sell the good the trader just bought and we sell it at the highest price possible, by computing the highest quantity of EURs possibly attainable from all markets and we try to sell the highest amount of that good in order to get the highest amount of EURs possible. Repeat again for i interactions to gain more profit. 
+The selling part follows an approach similar to the buying part, except for the fact that now we have to sell the good the trader just bought and we sell it at the highest price possible, by computing the highest quantity of EURs possibly attainable from all markets and we try to sell the highest amount of that good in order to get the highest amount of EURs possible. The operation for getting the best quantity for selling is similar to the one for the buy part:
+
+```
+ pub fn find_best_sell_quantity(&self, market: &Rc<RefCell<dyn Market>>, goodkind: GoodKind) -> f32 {
+        let mut sell_price = 0.0;
+        let mut eur_qty = 0.0;
+        for market_good in market.borrow().get_goods() {
+            if market_good.good_kind == GoodKind::EUR {
+                eur_qty = market_good.quantity;
+            }
+        }
+        let mut best_quantity = self.get_trader_goodquantity(goodkind);
+        if best_quantity > 0.0 {
+            sell_price = market.borrow().get_sell_price(goodkind, best_quantity).expect("Error in find_best_sell_quantity function");
+            while eur_qty < sell_price && best_quantity > 0.1 {
+                best_quantity = best_quantity * 0.5;
+                sell_price = market.borrow().get_sell_price(goodkind, best_quantity).expect("Error in find_best_sell_quantity function");
+            }
+        }
+        best_quantity
+    }
+```
+
+Also, to check if the sell operation makes sense or not (i.e. we can get profit from it) we do the following check:
+
+```
+ if best_quantity_sell > 1.0 && max_sell_price > 0.0 && (self.cash + max_sell_price >= initial_budget) {
+```
+
+Repeat again for i interactions to gain more profit. 
+
+![esempio grafico_2](https://user-images.githubusercontent.com/58253647/218355172-92629eb3-0194-4c00-b270-6b93e30875d4.png)
+
+Example of a chart that shows the cash flow of the trader during the simulation. 
 
 
 ## Trader number 2 (Taras Rashkevych)
