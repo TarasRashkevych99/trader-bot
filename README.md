@@ -65,10 +65,10 @@ This function computes which is the best good to buy and how much of that good w
 Now we check if a buy operation is possible. More specifically, we check the quantity that we want to buy (if it is too low, we don't buy, but just wait), if at least one buy operation is possible (by checking if the minimum price is a reasonable number, i.e. not f32::MAX) and that the buy operation doesn't take too much from the trader's budget. 
             
 ```
- if best_quantity > 1.0 && min_buy_price < f32::MAX
+ if best_quantity > 1.0 && min_buy_price < f32::MAX && (self.cash - min_buy_price >= self.cash * 0.25)
 ```
 
-If all checks, are alright, then we proceed by taking the three variables (the best kind of good, the best buy quantity and the best market to buy the good from) that we have obtained previously and do the lock_buy() and buy() functions. We execute these two functions in the following way:
+If all checks are fine, then we proceed by taking the three variables (the best kind of good, the best buy quantity and the best market to buy the good from) that we have obtained previously and do the lock_buy() and buy() functions. We execute these two functions in the following way:
             
 ```
  //do the lock_buy
@@ -77,14 +77,22 @@ If all checks, are alright, then we proceed by taking the three variables (the b
  let token = rt.block_on(self.lock_buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
 
  if let Ok(token) = token{
-     //buy
      rt.block_on(self.send_labels());
      rt.block_on(self.send_trader_goods());
+     //loop until i is reached
+     if i < self.time {
+          break;
+     }
      let delay = rt.block_on(self.get_delay_in_milliseconds());
      wait_before_calling_api(delay);
+     //buy
      rt.block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, token));
      rt.block_on(self.send_labels());
      rt.block_on(self.send_trader_goods());
+     //loop until i is reached
+     if i < self.time {
+          break;
+     }
  }else{
      continue;
  }
@@ -101,7 +109,11 @@ If the checks that we have done for the if part result being false, then we need
  rt.block_on(self.wait(best_kind, 0.0, 0.0, market_name));
  rt.block_on(self.send_labels());
  rt.block_on(self.send_trader_goods());
- continue;            
+ //loop until i is reached
+ if i < self.time {
+      break;
+ }
+ continue;          
 ```
              
 The selling part follows an approach similar to the buying part, except for the fact that now we have to sell the good the trader just bought and we sell it at the highest price possible, by computing the highest quantity of EURs possibly attainable from all markets and we try to sell the highest amount of that good in order to get the highest amount of EURs possible. The operation for getting the best quantity for selling is similar to the one for the buy part:
@@ -127,7 +139,7 @@ The selling part follows an approach similar to the buying part, except for the 
     }
 ```
 
-Also, to check if the sell operation makes sense or not (i.e. we can get profit from it) we do the following check:
+Also, before proceed with lock_sell and sell operations, we need to check if the sell operation would make sense or not (i.e. we can get profit from it) we do the following check:
 
 ```
  if best_quantity_sell > 1.0 && max_sell_price > 0.0 && (self.cash + max_sell_price >= initial_budget) {
