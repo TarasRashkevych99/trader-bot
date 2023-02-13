@@ -62,13 +62,13 @@ Then we start with the loop. At each interaction, we first check if the number i
 
 This function computes which is the best good to buy and how much of that good we can buy from a given market and considering the trader's cash. For each one of these markets we get the best kind of good we can buy from that market and at which quantity we can buy that good with trader's money. Then we compute the prices for each market using the get_buy_price() method using as parameters the values we obtained in the find_best_buy_quantity() method. Now, we compare the prices of the three markets and we decide which one is the mininum. In this way we spend less and we can potentailly get more goods from the market the trader chooses to trade with. As a result we get the best kind of good, the best buy quantity and the best market to buy the good from.
 
-Now we check if a buy operation is possible. More specifically, we check the quantity that we want to buy (if it is too low, we don't buy, but just wait), if at least one buy operation is possible (by checking if the minimum price is a reasonable number, i.e. not f32::MAX) and that the buy operation doesn't take too much from the trader's budget. 
+Now we check if a buy operation is possible. More specifically, we check the quantity that we want to buy (if it is too low, we don't buy, but just wait), if at least one buy operation is possible (by checking if the minimum price is a reasonable number, i.e. not f32::MAX) and that the buy operation doesn't take too much from the trader's budget. For the last check, we consider as the max_budget the maximum budget that the trader got during the simulation. This because sometimes the trader reaches the highest budget value possible too early and then it starts losing euros, thus value from its budget. The 10% limit is there to prevent having trader's budget going too low.
             
 ```
- if best_quantity > 1.0 && min_buy_price < f32::MAX
+ if best_quantity > 1.0 && min_buy_price < f32::MAX && (self.cash - min_buy_price >= max_budget * 0.10)
 ```
 
-If all checks, are alright, then we proceed by taking the three variables (the best kind of good, the best buy quantity and the best market to buy the good from) that we have obtained previously and do the lock_buy() and buy() functions. We execute these two functions in the following way:
+If all checks are fine, then we proceed by taking the three variables (the best kind of good, the best buy quantity and the best market to buy the good from) that we have obtained previously and do the lock_buy() and buy() functions. We execute these two functions in the following way:
             
 ```
  //do the lock_buy
@@ -77,14 +77,22 @@ If all checks, are alright, then we proceed by taking the three variables (the b
  let token = rt.block_on(self.lock_buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
 
  if let Ok(token) = token{
-     //buy
      rt.block_on(self.send_labels());
      rt.block_on(self.send_trader_goods());
+     //loop until i is reached
+     if i < self.time {
+          break;
+     }
      let delay = rt.block_on(self.get_delay_in_milliseconds());
      wait_before_calling_api(delay);
+     //buy
      rt.block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, token));
      rt.block_on(self.send_labels());
      rt.block_on(self.send_trader_goods());
+     //loop until i is reached
+     if i < self.time {
+          break;
+     }
  }else{
      continue;
  }
@@ -101,10 +109,47 @@ If the checks that we have done for the if part result being false, then we need
  rt.block_on(self.wait(best_kind, 0.0, 0.0, market_name));
  rt.block_on(self.send_labels());
  rt.block_on(self.send_trader_goods());
- continue;            
+ //loop until i is reached
+ if i < self.time {
+      break;
+ }
+ continue;          
 ```
              
-The selling part follows an approach similar to the buying part, except for the fact that now we have to sell the good the trader just bought and we sell it at the highest price possible, by computing the highest quantity of EURs possibly attainable from all markets and we try to sell the highest amount of that good in order to get the highest amount of EURs possible. Repeat again for i interactions to gain more profit. 
+The selling part follows an approach similar to the buying part, except for the fact that now we have to sell the good the trader just bought and we sell it at the highest price possible, by computing the highest quantity of EURs possibly attainable from all markets and we try to sell the highest amount of that good in order to get the highest amount of EURs possible. The operation for getting the best quantity for selling is similar to the one for the buy part:
+
+```
+ pub fn find_best_sell_quantity(&self, market: &Rc<RefCell<dyn Market>>, goodkind: GoodKind) -> f32 {
+        let mut sell_price = 0.0;
+        let mut eur_qty = 0.0;
+        for market_good in market.borrow().get_goods() {
+            if market_good.good_kind == GoodKind::EUR {
+                eur_qty = market_good.quantity;
+            }
+        }
+        let mut best_quantity = self.get_trader_goodquantity(goodkind);
+        if best_quantity > 0.0 {
+            sell_price = market.borrow().get_sell_price(goodkind, best_quantity).expect("Error in find_best_sell_quantity function");
+            while eur_qty < sell_price && best_quantity > 0.1 {
+                best_quantity = best_quantity * 0.5;
+                sell_price = market.borrow().get_sell_price(goodkind, best_quantity).expect("Error in find_best_sell_quantity function");
+            }
+        }
+        best_quantity
+    }
+```
+
+Also, before proceed with lock_sell and sell operations, we need to check if the sell operation would make sense or not (i.e. we can get profit from it) we do the following check:
+
+```
+ if best_quantity_sell > 1.0 && max_sell_price > 0.0 && (self.cash + max_sell_price >= initial_budget) {
+```
+
+Repeat again for i interactions to gain more profit. 
+
+![esempio grafico_2](https://user-images.githubusercontent.com/58253647/218355172-92629eb3-0194-4c00-b270-6b93e30875d4.png)
+
+Example of a chart that shows the cash flow of the trader during the simulation. 
 
 
 ## Trader number 2 (Taras Rashkevych)

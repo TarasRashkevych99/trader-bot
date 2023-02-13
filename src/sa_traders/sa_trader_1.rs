@@ -98,7 +98,6 @@ impl Trader_SA {
             tradergoods.push(TraderGood{kind: goodkind.borrow().get_kind().clone(), quantity: goodkind.borrow().get_qty()});
         }
         //println!("{:?}",tradergoods);
-        //wait_before_calling_api(self.get_delay_in_milliseconds().await);
         let _res = client
             .post("http://localhost:8000/traderGoods")
             .json(&tradergoods)
@@ -112,7 +111,6 @@ impl Trader_SA {
 
         wait_one_day!(self.bfb, self.rcnz, self.zse);
 
-        //wait_before_calling_api(self.get_delay_in_milliseconds().await);
         let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Wait, goodkind, 0.0, 0.0, market_name.to_string(), true, None)).send().await;
         self.time += 1;
     }
@@ -123,7 +121,6 @@ impl Trader_SA {
         let labels_bfb = self.bfb.borrow().get_goods();
         let labels_rcnz = self.rcnz.borrow().get_goods();
         let labels_zse = self.zse.borrow().get_goods();
-        //wait_before_calling_api(self.get_delay_in_milliseconds().await);
         let _res = client
             .post("http://localhost:8000/currentGoodLabels/".to_string() + "BFB")
             .json(&labels_bfb)
@@ -187,7 +184,6 @@ impl Trader_SA {
     pub fn find_best_sell_quantity(&self, market: &Rc<RefCell<dyn Market>>, goodkind: GoodKind) -> f32 {
         let mut sell_price = 0.0;
         let mut eur_qty = 0.0;
-
         for market_good in market.borrow().get_goods() {
             if market_good.good_kind == GoodKind::EUR {
                 eur_qty = market_good.quantity;
@@ -201,7 +197,6 @@ impl Trader_SA {
                 sell_price = market.borrow().get_sell_price(goodkind, best_quantity).expect("Error in find_best_sell_quantity function");
             }
         }
-
         best_quantity
     }
 
@@ -217,14 +212,12 @@ impl Trader_SA {
 
         match market.borrow_mut().lock_buy(goodkind, quantity, price, trader_name) {
             Ok(token) => {
-                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
                 self.time += 1;
                 Ok(token)
             },
             Err(e) => {
                 let e_string = format!("{:?}",e);
-                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedBuy, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                 Err(e)
             }
@@ -246,7 +239,6 @@ impl Trader_SA {
         //use the token to buy the good
         match market.borrow_mut().buy(token, &mut Good::new(GoodKind::EUR, price)) {
             Ok(increase) => {
-                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
                 self.time += 1;
                 //now that we have bought the good from the market, now we have to change
@@ -263,7 +255,6 @@ impl Trader_SA {
             },
             Err(e) => {
                 let e_string = format!("{:?}",e);
-                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://http://127.0.0.1:8000//log").json(&craft_log_event(self.time, CustomEventKind::Bought, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
             }
         };
@@ -281,14 +272,12 @@ impl Trader_SA {
 
         match market.borrow_mut().lock_sell(goodkind, quantity, price, trader_name) {
             Ok(token) => {
-                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
                 self.time += 1;
                 Ok(token)
             },
             Err(e) => {
                 let e_string = format!("{:?}",e);
-                //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                 let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::LockedSell, goodkind, quantity, price, market_name.to_string(), false, Some(e_string))).send().await;
                 Err(e)
             }
@@ -310,7 +299,6 @@ impl Trader_SA {
             //use the token to sell the good
             match market.borrow_mut().sell(token, &mut Good::new(goodkind.clone(), quantity)) {
                 Ok(increase_eur) => {
-                    //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                     let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), true, None)).send().await;
                     self.time += 1;
                     //now that we have sold the good to the market, now we have to change
@@ -327,7 +315,6 @@ impl Trader_SA {
                 },
                 Err(e) => {
                     let e_string = format!("{:?}",e);
-                    //wait_before_calling_api(self.get_delay_in_milliseconds().await);
                     let _res = client.post("http://localhost:8000/log").json(&craft_log_event(self.time, CustomEventKind::Sold, goodkind, quantity, price, market_name.to_string(), false, Some(e_string.clone()))).send().await;
                 }
             };
@@ -342,11 +329,17 @@ impl Trader_SA {
         //initial call to the API, to visualize our initial wallet and labels
         rt.block_on(self.send_labels());
         rt.block_on(self.send_trader_goods());
+
+        //define maximum profit reached, initially put to our initial budget
+        let mut max_budget = self.cash;
         loop {
-            //loop until i reaches 0
+            //loop until i is reached
             if i < self.time {
                 break;
             }
+
+            //set initial budget
+            let initial_budget = self.cash;
 
             //for each market get the best kind and quantity of good which could maximize profit
             let (best_quantity_bfb, kind_quantity_bfb) = self.find_best_buy_quantity(&self.bfb);
@@ -404,9 +397,11 @@ impl Trader_SA {
                 Err(_) => {}
             };
 
-            //check if the quantity is bigger than 1 and if at least one price is "ok"
+            //check if the quantity is bigger than 1, if at least one price is "ok"
             //(i.e. it doesn't have an error as its output)
-            if best_quantity > 1.0 && min_buy_price < f32::MAX{
+            //and if we wouldn't lose too much money
+            if best_quantity > 1.0 && min_buy_price < f32::MAX && (self.cash - min_buy_price >= max_budget * 0.10){
+            //if best_quantity > 1.0 && min_buy_price < f32::MAX{
                 //get the buy_price
                 let price = match best_market.borrow().get_buy_price(best_kind, best_quantity) {
                     Ok(price) => price,
@@ -421,14 +416,24 @@ impl Trader_SA {
                 let token = rt.block_on(self.lock_buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
 
                 if let Ok(token) = token{
-                    //buy
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    //loop until i is reached
+                    if i < self.time {
+                        break;
+                    }
                     let delay = rt.block_on(self.get_delay_in_milliseconds());
                     wait_before_calling_api(delay);
+                    //buy
                     rt.block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, token));
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    //loop until i is reached
+                    if i < self.time {
+                        break;
+                    }
+                }else{
+                    continue;
                 }
 
             } else {
@@ -438,6 +443,11 @@ impl Trader_SA {
                 rt.block_on(self.wait(best_kind, 0.0, 0.0, market_name));
                 rt.block_on(self.send_labels());
                 rt.block_on(self.send_trader_goods());
+                //loop until i is reached
+                if i < self.time {
+                    break;
+                }
+                continue;
             }
 
             //for each market get the best quantity of good which could maximize profit
@@ -448,7 +458,7 @@ impl Trader_SA {
 
             //define prices with kinds and quantity obtained previously
             let price_sell_bfb = self.bfb.borrow_mut().get_sell_price(best_kind, best_quantity_bfb_sell);
-            let price_sellrcnz = self.rcnz.borrow_mut().get_sell_price(best_kind, best_quantity_rcnz_sell * 0.7);
+            let price_sell_cnz = self.rcnz.borrow_mut().get_sell_price(best_kind, best_quantity_rcnz_sell * 0.7);
             let price_sell_zse = self.zse.borrow_mut().get_sell_price(best_kind, best_quantity_zse_sell);
 
             //define variables for deciding the best sell operation
@@ -470,11 +480,11 @@ impl Trader_SA {
                 }
                 Err(_) => {}
             };
-            match price_sellrcnz{
+            match price_sell_cnz{
                 Ok(_) => {
 
-                    if max_sell_price < price_sellrcnz.clone().unwrap(){
-                        max_sell_price = price_sellrcnz.unwrap();
+                    if max_sell_price < price_sell_cnz.clone().unwrap(){
+                        max_sell_price = price_sell_cnz.unwrap();
                         best_market_sell = &self.rcnz;
                         best_quantity_sell = best_quantity_rcnz_sell * 0.75;
                         market_name_sell = "RCNZ";
@@ -495,7 +505,7 @@ impl Trader_SA {
 
             //check if the quantity is bigger than 1 and if at least one price is "ok"
             //(i.e. it doesn't have an error as its output)
-            if best_quantity_sell > 1.0 && max_sell_price > 0.0{
+            if best_quantity_sell > 1.0 && max_sell_price > 0.0 && (self.cash + max_sell_price >= initial_budget) {
                 //we repeat the same procedure we did for the buy part, but now we consider variables for selling
                 let price_sell = match best_market_sell.borrow().get_sell_price(best_kind, best_quantity_sell) {
                     Ok(price_sell) => price_sell,
@@ -510,14 +520,26 @@ impl Trader_SA {
                 let token = rt.block_on(self.lock_sell_to_market(market_name_sell,best_kind, best_quantity_sell, price_sell, self.get_trader_name()));
 
                 if let Ok(token) = token{
-                    //sell
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    //loop until i is reached
+                    if i < self.time {
+                        break;
+                    }
                     let delay = rt.block_on(self.get_delay_in_milliseconds());
                     wait_before_calling_api(delay);
+                    //sell
                     rt.block_on(self.sell_to_market(market_name_sell,best_kind, best_quantity_sell, price_sell, token));
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    //loop until i is reached
+                    if i < self.time {
+                        break;
+                    }
+                    //change the maximum budget
+                    if max_budget < self.cash{
+                        max_budget = self.cash;
+                    }
                 }
             } else {
                 //wait
@@ -526,6 +548,10 @@ impl Trader_SA {
                 rt.block_on(self.wait(best_kind, 0.0, 0.0, market_name_sell));
                 rt.block_on(self.send_labels());
                 rt.block_on(self.send_trader_goods());
+                //loop until i is reached
+                if i < self.time {
+                    break;
+                }
             }
 
         }
