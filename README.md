@@ -21,4 +21,4 @@ The selling part follows an approach similar to the buying part, except for the 
 
 ## Data Visualizer (Roberto Cornacchiari)
 
-All the details regarding the data visualizer are located in this [link] (https://github.com/RobertoCornacchiari/DataVisualizer)
+All the details regarding the data visualizer are located in this [link](https://github.com/RobertoCornacchiari/DataVisualizer)
