@@ -141,9 +141,15 @@ impl Trader_SA {
     //method for getting delay
     async fn get_delay_in_milliseconds(&self) -> u64 {
         let client = reqwest::Client::new();
-        let res = client.get("http://localhost:8000/delay").send().await.unwrap();
-        let body = res.text().await.unwrap();
-        let delay_in_milliseconds: u64 = body.parse().unwrap();
+        let mut delay_in_milliseconds: u64 = 0;
+        let res = client.get("http://localhost:8000/delay").send().await;
+        if let Ok(res) = res {
+            delay_in_milliseconds = res.json::<u64>().await.unwrap();
+        } else {
+            let trader_config = common::trader_config::get_trader_config();
+            delay_in_milliseconds = trader_config.get_delay_in_milliseconds();
+        }
+
         return delay_in_milliseconds;
     }
 

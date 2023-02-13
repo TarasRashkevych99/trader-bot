@@ -1,6 +1,6 @@
 trading_days = 100
 budget = 100.0
 delay_in_milliseconds = 100
-trader_TR = false
-trader_SA = true
+trader_TR = true
+trader_SA = false
 trader_AB = false
