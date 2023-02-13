@@ -62,10 +62,10 @@ Then we start with the loop. At each interaction, we first check if the number i
 
 This function computes which is the best good to buy and how much of that good we can buy from a given market and considering the trader's cash. For each one of these markets we get the best kind of good we can buy from that market and at which quantity we can buy that good with trader's money. Then we compute the prices for each market using the get_buy_price() method using as parameters the values we obtained in the find_best_buy_quantity() method. Now, we compare the prices of the three markets and we decide which one is the mininum. In this way we spend less and we can potentailly get more goods from the market the trader chooses to trade with. As a result we get the best kind of good, the best buy quantity and the best market to buy the good from.
 
-Now we check if a buy operation is possible. More specifically, we check the quantity that we want to buy (if it is too low, we don't buy, but just wait), if at least one buy operation is possible (by checking if the minimum price is a reasonable number, i.e. not f32::MAX) and that the buy operation doesn't take too much from the trader's budget. 
+Now we check if a buy operation is possible. More specifically, we check the quantity that we want to buy (if it is too low, we don't buy, but just wait), if at least one buy operation is possible (by checking if the minimum price is a reasonable number, i.e. not f32::MAX) and that the buy operation doesn't take too much from the trader's budget. For the last check, we consider as the max_budget the maximum budget that the trader got during the simulation. This because sometimes the trader reaches the highest budget value possible too early and then it starts losing euros, thus value from its budget. The 10% limit is there to prevent having trader's budget going too low.
             
 ```
- if best_quantity > 1.0 && min_buy_price < f32::MAX && (self.cash - min_buy_price >= self.cash * 0.25)
+ if best_quantity > 1.0 && min_buy_price < f32::MAX && (self.cash - min_buy_price >= max_budget * 0.10)
 ```
 
 If all checks are fine, then we proceed by taking the three variables (the best kind of good, the best buy quantity and the best market to buy the good from) that we have obtained previously and do the lock_buy() and buy() functions. We execute these two functions in the following way:
