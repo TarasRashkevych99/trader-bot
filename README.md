@@ -19,4 +19,6 @@ The selling part follows an approach similar to the buying part, except for the 
 ## Trader number 2 
 ## Trader number 3
 
-## Data visualizer (WIP)
+## Data Visualizer (Roberto Cornacchiari)
+
+All the details regarding the data visualizer are located in this [link] (https://github.com/RobertoCornacchiari/DataVisualizer)
