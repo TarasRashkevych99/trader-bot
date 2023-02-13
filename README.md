@@ -104,7 +104,7 @@ If the checks that we have done for the if part result being false, then we need
  continue;            
 ```
              
-The selling part follows an approach similar to the buying part, except for the fact that now we have to sell the good the trader just bought adn we sell it at the highest price possible, by computing the highest quantity of EURs possibly attainable from all markets and we try to sell the highest amount of that good in order to get the highest amount of EURs possible. Repeat again for i interactions to gain more profit. 
+The selling part follows an approach similar to the buying part, except for the fact that now we have to sell the good the trader just bought and we sell it at the highest price possible, by computing the highest quantity of EURs possibly attainable from all markets and we try to sell the highest amount of that good in order to get the highest amount of EURs possible. Repeat again for i interactions to gain more profit. 
 
 
 ## Trader number 2 (Taras Rashkevych)
