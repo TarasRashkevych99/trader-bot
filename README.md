@@ -162,6 +162,7 @@ Firstly, the trader designates the best market to which buy the most convenient 
 > - $\frac{3}{2}$ of the trader's capital ($c$), if the trader is buying;
 > - the current quantity of good owned by the trader ($|g|:g\in G$), if the trader is selling.
 > Moreover, in the former case the quantity decreases as the market minimum rate (`exchange_rate_buy`,$f_b$) increases with the number of locks for sells already bargained since the trader is alive (`self.lock_sells`,$|L_s|$). On the other hand, when the trader sells: the trader's offered quantity raises with the maximum rate at which the market accepts goods (`exchange_rate_sell`,$f_s$) times the quantity of buyouts already negotiated with other markets (`self.lock_buyouts`,$|L_b|$).
+
 To sum up, the method performs:
 $$
 \begin{subequations}
