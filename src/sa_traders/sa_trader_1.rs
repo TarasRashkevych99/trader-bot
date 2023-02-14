@@ -2,11 +2,8 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use unitn_market_2022::good::good::Good;
 use unitn_market_2022::good::good_kind::GoodKind;
-use unitn_market_2022::market::{LockBuyError, LockSellError, Market, MarketGetterError};
-use bfb::bfb_market::Bfb as BFB;
-use RCNZ::RCNZ;
+use unitn_market_2022::market::{LockBuyError, LockSellError, Market};
 use unitn_market_2022::wait_one_day;
-use ZSE::market::ZSE;
 use crate::common::visualizer::{craft_log_event, CustomEventKind, LogEvent, wait_before_calling_api};
 use futures::executor::block_on;
 use tokio::runtime::Runtime;
@@ -335,7 +332,7 @@ impl Trader_SA {
         //initial call to the API, to visualize our initial wallet and labels
         rt.block_on(self.send_labels());
         rt.block_on(self.send_trader_goods());
-
+        println!("Trader at day {:?} has {:?} euros", self.time, self.cash);
         //define maximum profit reached, initially put to our initial budget
         let mut max_budget = self.cash;
         loop {
@@ -419,11 +416,13 @@ impl Trader_SA {
                 //do the lock_buy
                 let delay = rt.block_on(self.get_delay_in_milliseconds());
                 wait_before_calling_api(delay);
+                println!("Executing at day {:?} lock buy from {:?} with kind {:?}, quantity {:?}, and price {:?}", self.time, market_name.clone(), best_kind.clone(), best_quantity, price);
                 let token = rt.block_on(self.lock_buy_from_market(market_name, best_kind, best_quantity, price, self.get_trader_name()));
 
                 if let Ok(token) = token{
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    println!("Trader at day {:?} has {:?} euros", self.time, self.cash);
                     //loop until i is reached
                     if i < self.time {
                         break;
@@ -431,14 +430,18 @@ impl Trader_SA {
                     let delay = rt.block_on(self.get_delay_in_milliseconds());
                     wait_before_calling_api(delay);
                     //buy
+                    println!("Executing at day {:?} buy from {:?} with kind {:?}, quantity {:?}, and price {:?}", self.time, market_name.clone(), best_kind.clone(), best_quantity, price);
                     rt.block_on(self.buy_from_market(market_name, best_kind, best_quantity, price, token));
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    println!("Trader at day {:?} has {:?} euros", self.time, self.cash);
+
                     //loop until i is reached
                     if i < self.time {
                         break;
                     }
                 }else{
+                    println!("Error on lock buy");
                     continue;
                 }
 
@@ -446,9 +449,12 @@ impl Trader_SA {
                 //wait
                 let delay = rt.block_on(self.get_delay_in_milliseconds());
                 wait_before_calling_api(delay);
+                println!("Executing at day {:?} wait on {:?} with kind {:?}", self.time, market_name.clone(), best_kind.clone());
                 rt.block_on(self.wait(best_kind, 0.0, 0.0, market_name));
                 rt.block_on(self.send_labels());
                 rt.block_on(self.send_trader_goods());
+                println!("Trader at day {:?} has {:?} euros", self.time, self.cash);
+
                 //loop until i is reached
                 if i < self.time {
                     break;
@@ -523,11 +529,14 @@ impl Trader_SA {
                 //do the lock_sell
                 let delay = rt.block_on(self.get_delay_in_milliseconds());
                 wait_before_calling_api(delay);
+                println!("Executing at day {:?} lock sell to {:?} with kind {:?}, quantity {:?}, and price {:?}", self.time, market_name_sell.clone(), best_kind.clone(), best_quantity_sell, price_sell);
                 let token = rt.block_on(self.lock_sell_to_market(market_name_sell,best_kind, best_quantity_sell, price_sell, self.get_trader_name()));
 
                 if let Ok(token) = token{
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    println!("Trader at day {:?} has {:?} euros", self.time, self.cash);
+
                     //loop until i is reached
                     if i < self.time {
                         break;
@@ -535,9 +544,12 @@ impl Trader_SA {
                     let delay = rt.block_on(self.get_delay_in_milliseconds());
                     wait_before_calling_api(delay);
                     //sell
+                    println!("Executing at day {:?} sell to {:?} with kind {:?}, quantity {:?}, and price {:?}", self.time, market_name_sell.clone(), best_kind.clone(), best_quantity_sell, price_sell);
                     rt.block_on(self.sell_to_market(market_name_sell,best_kind, best_quantity_sell, price_sell, token));
                     rt.block_on(self.send_labels());
                     rt.block_on(self.send_trader_goods());
+                    println!("Trader at day {:?} has {:?} euros", self.time, self.cash);
+
                     //loop until i is reached
                     if i < self.time {
                         break;
@@ -546,14 +558,19 @@ impl Trader_SA {
                     if max_budget < self.cash{
                         max_budget = self.cash;
                     }
+                }else{
+                    println!("Error on lock sell");
                 }
             } else {
                 //wait
                 let delay = rt.block_on(self.get_delay_in_milliseconds());
                 wait_before_calling_api(delay);
+                println!("Executing at day {:?} wait on {:?} with kind {:?}", self.time, market_name_sell.clone(), best_kind.clone());
                 rt.block_on(self.wait(best_kind, 0.0, 0.0, market_name_sell));
                 rt.block_on(self.send_labels());
                 rt.block_on(self.send_trader_goods());
+                println!("Trader at day {:?} has {:?} euros", self.time, self.cash);
+
                 //loop until i is reached
                 if i < self.time {
                     break;

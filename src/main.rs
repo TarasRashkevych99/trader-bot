@@ -15,10 +15,13 @@ fn main() {
     let trader_config = common::trader_config::get_trader_config();
     let (mut bfb, mut rcnz, mut zse) = new_random();
     let run_time = Runtime::new().unwrap();
+    println!("Waiting for trader selection");
     let res = run_time.block_on(async { get_trader_id().await });
 
     match res {
         0 => {
+            print_markets("Markets before with random quantities", &bfb, &rcnz, &zse);
+
             let mut trader_sa = Trader_SA::new(
                 "RAST".to_string(),
                 trader_config.get_budget(),
@@ -27,6 +30,7 @@ fn main() {
                 zse.clone(),
             );
 
+            println!("Running Trader_SA strategy");
             trader_sa.strategy(trader_config.get_trading_days());
 
             print_markets("Markets after with random quantities", &bfb, &rcnz, &zse);
