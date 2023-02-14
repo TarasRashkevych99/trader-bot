@@ -31,6 +31,8 @@ fn main() {
 
         print_markets("Markets after with random quantities", &bfb, &rcnz, &zse);
     } else if trader_config.is_trader_AB() {
-        // trader di Alfredo
+        let mut trader_ab=ab_traders::ab_traders::Trader::new("RAST".to_string(), trader_config.get_trading_days(), trader_config.get_budget(), vec![bfb.clone(),rcnz.clone(),zse.clone()]);
+        trader_ab.trade(reqwest::Client::new());
+        print_markets("Markets after with random quantities", &bfb, &rcnz, &zse);
     }
 }
