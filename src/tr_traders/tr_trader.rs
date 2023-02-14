@@ -70,7 +70,7 @@ impl Trader_TR {
 
             let available_good_quantity_to_buy = self.get_market_good_quantity_by_kind(&market_to_buy_from, &good_kind);
 
-            if self.is_positive_and_big_enough(available_good_quantity_to_buy) && self.is_wallet_euro_balance_smaller_than_initial_euro_balance_after_buying(&market_to_buy_from, available_good_quantity_to_buy, &good_kind) {
+            if self.is_positive_and_big_enough(available_good_quantity_to_buy) {
                 let (good_quantity_to_buy, price_market_wants_to_be_paid) = self.calculate_optimal_purchase_option(Rc::clone(&market_to_buy_from), available_good_quantity_to_buy, good_kind.clone());
                 if !self.is_positive_and_big_enough(good_quantity_to_buy) {
                     wait_one_day!(bfb, rcnz, zse);
