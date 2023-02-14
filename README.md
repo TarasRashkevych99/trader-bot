@@ -189,7 +189,8 @@ At each iteration, the method matches optional content of local variable `last_l
   - *trader will then try to perform a fresh new buy*
 ### Termination
 The trade procedure terminates in the following cases:
-- all the markets reached their max allowed lock quantity regarding trades with the current trader instance (`Err(LockBuyError::MaxAllowedLocksReached)`)
+- all the markets reached their max allowed lock quantity regarding trades with the current trader instance (`Err(LockBuyError::MaxAllowedLocksReached)`),
+- local counter `i` reaches `self.ttl`.
 
 ## Data Visualizer (Roberto Cornacchiari)
 All the details regarding the data visualizer are located into this [link](https://github.com/RobertoCornacchiari/DataVisualizer)
