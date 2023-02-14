@@ -33,7 +33,7 @@ pub struct Trader{
     goods: Rc<RefCell<HashMap<GoodKind,Good>>>,
     markets: HashMap<String,Rc<RefCell<dyn Market>>>,
     lock_sells: HashMap<GoodKind,Vec<String>>,
-    lock_purchases: HashMap<GoodKind,Vec<String>>,
+    lock_buyouts: HashMap<GoodKind,Vec<String>>,
 }
 
 impl Trader{
@@ -50,7 +50,7 @@ impl Trader{
             ]))),
             markets: markets.into_iter().map(|m| (String::from(m.borrow().get_name()),m.clone())).collect(),
             lock_sells: HashMap::from([(USD,vec![]),(YEN,vec![]),(YUAN,vec![])]),
-            lock_purchases: HashMap::from([(USD,vec![]),(YEN,vec![]),(YUAN,vec![])]),
+            lock_buyouts: HashMap::from([(USD,vec![]),(YEN,vec![]),(YUAN,vec![])]),
         }
     }
     pub fn best_sell(&self,gk:GoodKind)->Option<(String, Rc<RefCell<dyn Market>>)>{
@@ -83,21 +83,21 @@ impl Trader{
         }
         bestsells.into_iter().min_by(|(_,x),(_,y)| x.quantity.total_cmp(&y.quantity))
     }
-    pub fn get_qty(&self,k: GoodKind,qty: f32,price: f32,e: EventKind)->Option<f32>{
+    pub fn get_qty(&self,k: GoodKind,qty: f32,rate: f32,e: EventKind)->Option<f32>{
         match e{
             // the value ever remains under the half of the amount of sold goods and it is modulated according to the quantity
             // of the good that the trader is owning during the lock buy
             EventKind::LockedBuy=>{
-                Some((price.abs()/
+                Some((1./(rate*
                 match self.lock_sells.get(&k){
                     Some(a)=>a.len() as f32,
-                    None=>1.0
-                }).atan()*self.cash/PI)
+                    None=>1.
+                })).atan()*self.cash/(3.*PI))
             },
             // the trader can sell a quantity
             EventKind::LockedSell=>{
-                Some((price/
-                match self.lock_purchases.get(&k){
+                Some((rate*
+                match self.lock_buyouts.get(&k){
                     Some(a)=>a.len() as f32,
                     None=>1.
                 }).atan()*2.*qty/PI)
@@ -122,7 +122,7 @@ impl Trader{
     pub fn lock_buy(&mut self, m: Rc<RefCell<dyn Market>>,k: GoodKind,qty: f32,price:f32)->Result<(f32,f32,String), unitn_market_2022::market::LockBuyError>{
         match m.borrow_mut().lock_buy(k, qty, price, self.name.clone()){
             Ok(t)=>{
-                match self.lock_purchases.get_mut(&k){
+                match self.lock_buyouts.get_mut(&k){
                     Some(a)=>a.push(t.clone()),
                     None=>println!("not found {:?}",k)
                 }
@@ -169,6 +169,7 @@ impl Trader{
         r.block_on(self.post_traderGoods(&client));
         r.block_on(self.post_currentGoodLabels(&client));
         for mut i in 0..self.ttl{
+            if self.markets.is_empty(){ println!("Empty self.markets");break }
             match last_lock.clone(){
                 // tries to resell the just bought good
                 Some((EventKind::Bought,k))=>{
@@ -188,7 +189,7 @@ impl Trader{
                             match self.sell(market.clone(), token.clone(),k, qty){
                                 Ok(good)=>{
                                     self.cash+=offer;
-                                    self.lock_purchases.clear();
+                                    // self.lock_purchases.clear();
                                     r.block_on(self.log(&client, &mut i, CustomEventKind::Sold, k, qty, offer, m_sell.clone(), true, None));
                                     r.block_on(self.post_traderGoods(&client));
                                     r.block_on(self.post_currentGoodLabels(&client));
@@ -205,7 +206,8 @@ impl Trader{
                             r.block_on(self.log(&client, &mut i, CustomEventKind::LockedSell, k, qty, offer, m_sell.clone(), false, Some(format!("{:?}",LockSellError::InsufficientDefaultGoodQuantityAvailable{
                                 offered_good_kind, offered_good_quantity, available_good_quantity
                             }))));
-                            self.markets.remove(&m_sell);
+                            // self.markets.remove(&m_sell);
+                            last_lock=None
                         },
                         Err(lse)=>{
                             r.block_on(self.log(&client, &mut i, CustomEventKind::LockedSell, k, qty, offer,m_sell, false, Some(format!("{:?}",lse))));
@@ -224,7 +226,7 @@ impl Trader{
                             (m_buy,market,rate_buy,gl.quantity,k)
                         },
                         _=>{
-                            let Some((m_buy,gl))=self.get_best_buy() else { return; };
+                            let Some((m_buy,gl))=self.get_best_buy() else { println!("{}",self.markets.len());break };
                             let market=self.markets.get(&m_buy).unwrap().clone();
                             last_lock=Some((EventKind::Bought,gl.good_kind));
                             (m_buy.clone(),market,gl.exchange_rate_buy,gl.quantity,gl.good_kind)
@@ -232,17 +234,20 @@ impl Trader{
                     };
                     match self.get_qty(k, qty, rate_buy, EventKind::LockedBuy){
                         Some(qty)=>{
-                            let price=match market.borrow().get_buy_price(k, qty){ Ok(price)=>price,Err(e)=>{println!("{:?}",e); todo!()} };
+                            let price=match market.borrow().get_buy_price(k, qty){
+                                Ok(price)=>price,
+                                Err(e)=>{ println!("{:?}",e); last_lock=None; continue; } };
                             match self.lock_buy(market.clone(), k, qty,price){
-                                Ok((qty,price,token))=>{
+                                Ok((mut qty,mut price,token))=>{
                                     r.block_on(self.log(&client,&mut i, CustomEventKind::LockedBuy, k, qty, price, m_buy.clone(), true, None));
                                     r.block_on(self.post_traderGoods(&client));
                                     r.block_on(self.post_currentGoodLabels(&client));
-                                    match self.buy(market, token.clone(), if m_buy=="ZSE".to_string(){ price }else {qty} ){
+                                    if &m_buy=="ZSE"{ let tmp=price; price=qty; qty=tmp; }else {()}
+                                    match self.buy(market, token.clone(), qty ){
                                         Ok(good)=>{
                                             self.cash-=price;
                                             let _=self.goods.borrow_mut().get_mut(&k).unwrap().merge(good);
-                                            self.lock_sells.clear();
+                                            // self.lock_sells.clear();
                                             r.block_on(self.log(&client, &mut i, CustomEventKind::Bought, k, qty, price, m_buy.clone(), true, None));
                                             r.block_on(self.post_traderGoods(&client));
                                             r.block_on(self.post_currentGoodLabels(&client));
@@ -260,13 +265,14 @@ impl Trader{
                                 Err(LockBuyError::MaxAllowedLocksReached)=>{
                                     r.block_on(self.log(&client, &mut i, CustomEventKind::LockedBuy, k, qty, price, m_buy.to_string(), false, Some(format!("{:?}",LockBuyError::MaxAllowedLocksReached))));
                                     self.markets.remove(&m_buy);
-                                    i+=1;
+                                    last_lock=Some((EventKind::Sold,k));
                                 },
+                                Err(LockBuyError::InsufficientGoodQuantityAvailable { requested_good_kind, requested_good_quantity, available_good_quantity })=>{
+                                    last_lock=Some((EventKind::Bought,k));
+                                }
                                 Err(lbe)=>{
                                     r.block_on(self.log(&client, &mut i, CustomEventKind::LockedBuy, k, qty, price, m_buy.to_string(), false, Some(format!("{:?}",lbe))));
                                     last_lock=None;
-                                    panic!();
-                                    i+=1;
                                 }
                             }
                         },
@@ -275,5 +281,6 @@ impl Trader{
                 }
             }
         }
+
     }
 }

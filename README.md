@@ -155,6 +155,40 @@ Example of a chart that shows the cash flow of the trader during an instance of 
 ## Trader number 2 (Taras Rashkevych)
 
 ## Trader number 3 (Alfredo Bombace)
+> Trading of ab_trader::Trader starts with a call to method `trade(...)` over a newly instanced `&mut Self`.
+
+Firstly, the trader designates the best market to which buy the most convenient good according to its `exchange_rate_buy` and `quantity` owned by that market; hence the trader, at the first step, will buy that good from the market which offers the cheapest price and the maximum availability. The quantity of bought good, and the quantity of each trader's transaction, is carried out by the `self.get_qty(...)` method which applies a self-stabilizing curve working as follows:
+> The trigonometric curve is an arctangent with an horizontal asymptote to:
+> - $\frac{3}{2}$ of the trader's capital ($c$), if the trader is buying;
+> - the current quantity of good owned by the trader ($|g|:g\in G$), if the trader is selling.
+> Moreover, in the former case the quantity decreases as the market minimum rate (`exchange_rate_buy`,$f_b$) increases with the number of locks for sells already bargained since the trader is alive (`self.lock_sells`,$|L_s|$). On the other hand, when the trader sells: the trader's offered quantity raises with the maximum rate at which the market accepts goods (`exchange_rate_sell`,$f_s$) times the quantity of buyouts already negotiated with other markets (`self.lock_buyouts`,$|L_b|$).
+To sum up, the method performs:
+$$
+\begin{subequations}
+\begin{flalign}
+y=\frac{c}{3\pi}\tan^{-1}\left(\frac{1}{f_b|L_s|}\right)
+\end{flalign}
+\begin{flalign}
+y=\frac{2|g|}{\pi}\tan^{-1}\left(f_s|L_b|\right)
+\end{flalign}
+\end{subequations}
+$$
+### Trading
+At each iteration, the method matches optional content of local variable `last_lock`: it is a tuple of `EventKind` and `GoodKind` used to manage trader's decisions on the basis of the previous (last) concluded transaction:
+- if the content is `None` then the trader will try to perform a buy transaction according to the most convenient parameters thanks to `get_best_buy` (newly designated market to perform the cheapest buyout)···
+  - *after both the success and the failure due insufficient good quantity, `last_lock` will trigger a sell transaction for the same good (`Bought` event)*
+  - *after the failure due locks limit, `last_lock`'s event is set to `Sold` in order to trigger a retry of buy without that market*
+  - *after other failures, `last_lock` will trigger a fresh new cheapest market search (`None`)*
+,
+- if the content matches the `Bought` event, the trader will try to sell the specified good kind according to the quantity computed thanks to the above function···
+  - *after success, the method will try to buy the same kind (`Sold` event)*
+  - *after failure, the method will try to buy a fresh new cheapest kind (`None`)*
+, 
+- if the content matches the `Sold` event, along with the respective kind, the trader will try to purchase the already sold kind at a (hopefully) better price from either the same market or one of the others···
+  - *trader will then try to perform a fresh new buy*
+### Termination
+The trade procedure terminates in the following cases:
+- all the markets reached their max allowed lock quantity regarding trades with the current trader instance (`Err(LockBuyError::MaxAllowedLocksReached)`)
 
 ## Data Visualizer (Roberto Cornacchiari)
 All the details regarding the data visualizer are located into this [link](https://github.com/RobertoCornacchiari/DataVisualizer)
