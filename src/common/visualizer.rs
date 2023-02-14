@@ -57,19 +57,44 @@ pub fn wait_before_calling_api(milliseconds: u64) {
 }
 
 pub async fn get_trader_id() -> u8 {
-    let mut connection = EventSource::get("http://localhost:8000/traderToUse");
+    let client = reqwest::Client::new();
+    let res = client.get("http://localhost:8000/delay").send().await;
     let mut id: u8 = 4;
 
-    loop {
-        let next = connection.next().await;
+    if let Err(res) = res {
+        let trader_config = common::trader_config::get_trader_config();
+        if trader_config.is_trader_SA() {
+            id = 0;
+        } else if trader_config.is_trader_AB() {
+            id = 1;
+        } else if trader_config.is_trader_TR() {
+            id = 2;
+        }
+        return id;
+    } else {
+        let mut connection = EventSource::get("http://localhost:8000/traderToUse");
+        loop {
+            let next = connection.next().await;
 
-        match next {
-            Some(content) => match content {
-                Ok(ReqEvent::Message(message)) => {
-                    id = message.data.parse::<u8>().unwrap();
-                    break;
-                }
-                Err(err) => {
+            match next {
+                Some(content) => match content {
+                    Ok(ReqEvent::Message(message)) => {
+                        id = message.data.parse::<u8>().unwrap();
+                        break;
+                    }
+                    Err(err) => {
+                        let trader_config = common::trader_config::get_trader_config();
+                        if trader_config.is_trader_SA() {
+                            id = 0;
+                        } else if trader_config.is_trader_AB() {
+                            id = 1;
+                        } else if trader_config.is_trader_TR() {
+                            id = 2;
+                        }
+                    }
+                    _ => continue
+                },
+                None => {
                     let trader_config = common::trader_config::get_trader_config();
                     if trader_config.is_trader_SA() {
                         id = 0;
@@ -79,19 +104,8 @@ pub async fn get_trader_id() -> u8 {
                         id = 2;
                     }
                 }
-                _ => continue
-            },
-            None => {
-                let trader_config = common::trader_config::get_trader_config();
-                if trader_config.is_trader_SA() {
-                    id = 0;
-                } else if trader_config.is_trader_AB() {
-                    id = 1;
-                } else if trader_config.is_trader_TR() {
-                    id = 2;
-                }
             }
         }
+        id
     }
-    id
 }
