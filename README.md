@@ -4,8 +4,8 @@ Trader project that contains trader bots that interact with different markets de
 ## Index
 * Traders
   * Buy low - sell high bot (Sabin Andone)
-  * Trader number 2 
-  * Trader number 3
+  * Trader number 2 (Taras Rashkevych)
+  * Trader number 3 (Alfredo Bombace)
 * Data visualizer (Roberto Cornacchiari)
 
 ## Buy low - sell high bot (Sabin Andone)
@@ -142,14 +142,14 @@ The selling part follows an approach similar to the buying part, except for the 
 Also, before proceed with lock_sell and sell operations, we need to check if the sell operation would make sense or not (i.e. we can get profit from it) we do the following check:
 
 ```
- if best_quantity_sell > 1.0 && max_sell_price > 0.0 && (self.cash + max_sell_price >= initial_budget) {
+ if best_quantity_sell > 1.0 && max_sell_price > 0.0 && (self.cash + max_sell_price >= initial_budget * 0.9) {
 ```
 
 Repeat again for i interactions to gain more profit. 
 
 ![esempio grafico_2](https://user-images.githubusercontent.com/58253647/218355172-92629eb3-0194-4c00-b270-6b93e30875d4.png)
 
-Example of a chart that shows the cash flow of the trader during the simulation. 
+Example of a chart that shows the cash flow of the trader during an instance of the simulation of the strategy. This chart has been created using our data visualizer.
 
 
 ## Trader number 2 (Taras Rashkevych)
