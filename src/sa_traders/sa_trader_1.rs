@@ -511,7 +511,7 @@ impl Trader_SA {
 
             //check if the quantity is bigger than 1 and if at least one price is "ok"
             //(i.e. it doesn't have an error as its output)
-            if best_quantity_sell > 1.0 && max_sell_price > 0.0 && (self.cash + max_sell_price >= initial_budget) {
+            if best_quantity_sell > 1.0 && max_sell_price > 0.0 && (self.cash + max_sell_price >= initial_budget * 0.9) {
                 //we repeat the same procedure we did for the buy part, but now we consider variables for selling
                 let price_sell = match best_market_sell.borrow().get_sell_price(best_kind, best_quantity_sell) {
                     Ok(price_sell) => price_sell,
