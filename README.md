@@ -8,7 +8,7 @@ Trader project that contains trader bots that interact with different markets de
   * Trader number 3 (Alfredo Bombace)
 * Data visualizer (Roberto Cornacchiari)
 
-## Buy low - sell high bot (Sabin Andone)
+## Buy low - sell high trader bot (Sabin Andone)
 The trader bot which will be discussed in this section adopts a simple yet effective approach to commercialize goods with the market this bot interacts with. The strategy consists of buying goods at the lowest price possible from all markets, and then selling the goods we just bought at the highest price possible, in order to get the highest amount of EURs possible (i.e. get profit).   
 
 It works as following: first, since this bot needs to communicate its data to the Data Visualizer, we need to do an initial call to send its initial data, necessary to see tha starting point of our simulation. To do so, we also define the Runtime variable, as in the following case:
@@ -152,7 +152,29 @@ Repeat again for i interactions to gain more profit.
 Example of a chart that shows the cash flow of the trader during an instance of the simulation of the strategy. This chart has been created using our data visualizer.
 
 
-## Trader number 2 (Taras Rashkevych)
+## Randomized max profit trader bot with balancing (Taras Rashkevych)
+As the vast majority of the existing strategies that are used to get the
+maximum profit, the strategy that has been implemented for this trader bot
+is based on the **core idea** of buying the cheapest good present in one of the markets
+and selling it at the highest price possible. The big difference between this
+strategy and the others is that this strategy is **randomized**, which means that
+calling the procedure called `get_max_profit_pair_by_exchange_rate` will return
+the market to buy from, the market to sell to with the type of good to be traded, that
+may not be the best possible pair of markets and good to trade, because it will be
+randomly chosen from the list of the best possible pairs of markets and goods, but
+it will certainly give the trader a profit. The trader will also try to **balance** the markets, which
+means that it will try to buy and sell quantities of goods that are equal to each,
+but also that are not too big or too small. In fact, the trader will try to buy and sell
+at **maximum 2/3** of the quantity of the good that has been chosen, as defined
+by the procedures `calculate_optimal_purchase_option` and `calculate_optimal_sale_option`, and if the buy or sell
+deal is not possible for that quantity of good, the trader will try to reduce this quantity
+by using an exponential decay function. Also, the trader will not try to buy or sell
+quantities of goods that are too small, as defined by the procedure `is_positive_and_big_enough`
+which means that if the quantity of the good is smaller than one unit, 
+the trader will not try to buy or sell it, but it will wait until some new opportunity presents itself. 
+So, what is guaranteed by this strategy is that the trader will always make some profit, even if it is not
+the best one at the moment, and it will increase in the long run.
+
 
 ## Trader number 3 (Alfredo Bombace)
 > Trading of ab_trader::Trader starts with a call to method `trade(...)` over a newly instanced `&mut Self`.
