@@ -3,8 +3,8 @@ Trader project that contains trader bots that interact with different markets de
 
 ## Index
 * Traders
-  * Buy low - sell high bot (Sabin Andone)
-  * Trader number 2 (Taras Rashkevych)
+  * Buy low - sell high trader bot (Sabin Andone)
+  * Randomized max profit trader bot with balancing (Taras Rashkevych)
   * Trader number 3 (Alfredo Bombace)
 * Data visualizer (Roberto Cornacchiari)
 
